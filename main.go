@@ -13,9 +13,13 @@ import (
 	"paymentfc/routes"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// .env 파일이 있으면 로드 (없어도 에러 안 남)
+	godotenv.Load()
+
 	cfg := config.LoadConfig()
 
 	log.SetupLogger()

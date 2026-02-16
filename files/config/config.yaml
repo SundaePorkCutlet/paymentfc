@@ -2,7 +2,7 @@ app:
   port: 8083
 
 database:
-  host: postgres
+  host: postgres-payment
   port: 5432
   user: admin
   password: admin
