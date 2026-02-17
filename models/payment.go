@@ -3,14 +3,13 @@ package models
 import "time"
 
 type Payment struct {
-	ID            int64     `json:"id" gorm:"primaryKey;autoIncrement"`
-	OrderID       int64     `json:"order_id" gorm:"not null"`
-	UserID        int64     `json:"user_id" gorm:"not null"`
-	Amount        float64   `json:"amount" gorm:"not null"`
-	PaymentMethod string    `json:"payment_method" gorm:"not null"`
-	Status        int       `json:"status" gorm:"not null;default:0"`
-	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID         int64     `json:"id" gorm:"primaryKey;autoIncrement;type:bigserial"`
+	OrderID    int64     `json:"order_id" gorm:"type:bigint"`
+	UserID     int64     `json:"user_id" gorm:"type:bigint"`
+	ExternalID string    `json:"external_id" gorm:"type:text;uniqueIndex;not null"`
+	Amount     float64   `json:"amount" gorm:"type:numeric"`
+	Status     string    `json:"status" gorm:"type:varchar"`
+	CreateTime time.Time `json:"create_time" gorm:"type:timestamp;default:CURRENT_TIMESTAMP"`
 }
 
 // OrderCreatedEvent ORDERFC에서 Kafka로 발행하는 이벤트 구조체
