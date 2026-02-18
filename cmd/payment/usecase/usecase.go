@@ -9,6 +9,7 @@ import (
 	"paymentfc/models"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type PaymentUsecase interface {
@@ -45,6 +46,35 @@ func (u *paymentUsecase) ProcessPaymentWebhook(ctx context.Context, payload mode
 		if err != nil {
 			log.Logger.Error().Err(err).Msgf("Failed to extract order ID from external_id: %s", payload.ExternalID)
 			return err
+		}
+		paid, err := u.paymentService.IsAlreadyPaid(ctx, orderID)
+		if err != nil {
+			log.Logger.Error().Err(err).Msgf("Failed to check payment status for order_id: %d", orderID)
+			return err
+		}
+		if paid {
+			log.Logger.Info().Int64("order_id", orderID).Msg("Payment already processed, skipping")
+			return nil
+		}
+		amount, err := u.paymentService.GetAmountByOrderID(ctx, orderID)
+		if err != nil {
+			log.Logger.Error().Err(err).Msgf("Failed to get payment amount for order_id: %d", orderID)
+			return err
+		}
+		if payload.Amount > 0 && amount != payload.Amount {
+			log.Logger.Error().Msgf("Payment amount mismatch for order_id: %d, expected=%.2f, got=%.2f", orderID, amount, payload.Amount)
+			anomaly := &models.PaymentAnomaly{
+				OrderID:     orderID,
+				ExternalID:  payload.ExternalID,
+				AnomalyType: constant.AnomalyTypeInvalidAmount,
+				Notes:       fmt.Sprintf("amount mismatch: expected=%.2f, got=%.2f", amount, payload.Amount),
+				Status:      constant.PaymentAnomalyStatusNeedToCheck,
+				UpdateTime:  time.Now(),
+			}
+			if err := u.paymentService.SavePaymentAnomaly(ctx, anomaly); err != nil {
+				log.Logger.Error().Err(err).Msgf("Failed to save payment anomaly for order_id: %d", orderID)
+			}
+			return fmt.Errorf("amount mismatch: order_id=%d, expected=%.2f, got=%.2f", orderID, amount, payload.Amount)
 		}
 		return u.paymentService.ProcessPaymentSuccess(ctx, orderID)
 	case constant.PaymentStatusFailed:

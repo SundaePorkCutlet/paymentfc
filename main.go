@@ -29,11 +29,11 @@ func main() {
 
 	db := resource.InitDB(cfg.Database)
 
-	// AutoMigrate: payment 테이블 자동 생성/업데이트
-	if err := db.AutoMigrate(&models.Payment{}); err != nil {
+	// AutoMigrate: payment, payment_anomalies, failed_events 테이블 자동 생성/업데이트
+	if err := db.AutoMigrate(&models.Payment{}, &models.PaymentAnomaly{}, &models.FailedEvent{}); err != nil {
 		log.Logger.Fatal().Err(err).Msg("Failed to migrate database")
 	}
-	log.Logger.Info().Msg("Database migration completed - payment table created")
+	log.Logger.Info().Msg("Database migration completed - payment, payment_anomalies, failed_events tables created")
 
 	// Kafka Writer 생성 (payment.success 토픽 발행용)
 	kafkaWriter := &kafkago.Writer{
