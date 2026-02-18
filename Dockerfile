@@ -26,7 +26,7 @@ COPY --from=builder /app/main .
 COPY --from=builder /app/files/config ./files/config
 
 # 포트 노출
-EXPOSE 8083
+EXPOSE 28083
 
 # 애플리케이션 실행
 CMD ["./main"]
