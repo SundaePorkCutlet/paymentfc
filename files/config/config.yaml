@@ -17,7 +17,7 @@ secret:
   jwt_secret: secret301
 
 kafka:
-  broker: localhost:9093
+  broker: localhost:29093
   topics:
     - order.created: order.created
     - payment.success: payment.success
