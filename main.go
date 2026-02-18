@@ -1,19 +1,22 @@
 package main
 
 import (
+	"context"
 	"paymentfc/cmd/payment/handler"
 	"paymentfc/cmd/payment/repository"
 	"paymentfc/cmd/payment/resource"
 	"paymentfc/cmd/payment/service"
 	"paymentfc/cmd/payment/usecase"
 	"paymentfc/config"
+	"paymentfc/infrastructure/constant"
 	"paymentfc/infrastructure/log"
 	"paymentfc/models"
 	"paymentfc/routes"
+	"paymentfc/kafka"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/segmentio/kafka-go"
+	kafkago "github.com/segmentio/kafka-go"
 )
 
 func main() {
@@ -33,19 +36,30 @@ func main() {
 	log.Logger.Info().Msg("Database migration completed - payment table created")
 
 	// Kafka Writer 생성 (payment.success 토픽 발행용)
-	kafkaWriter := &kafka.Writer{
-		Addr:     kafka.TCP(cfg.Kafka.Broker),
-		Topic:    cfg.Kafka.Topics[1]["payment.success"],
-		Balancer: &kafka.LeastBytes{},
+	kafkaWriter := &kafkago.Writer{
+		Addr:     kafkago.TCP(cfg.Kafka.Broker),
+		Topic:    constant.KafkaTopicPaymentSuccess,
+		Balancer: &kafkago.LeastBytes{},
 	}
 	defer kafkaWriter.Close()
 
 	// 의존성 주입
 	paymentDatabase := repository.NewPaymentDatabase(db)
 	paymentPublisher := repository.NewKafkaPublisher(kafkaWriter)
+	xenditClient := repository.NewXenditClient(cfg.Xendit.XenditAPIKey)
+	xenditService := service.NewXenditService(paymentDatabase, xenditClient)
+	xenditUsecase := usecase.NewXenditUsecase(xenditService)
+
 	paymentService := service.NewPaymentService(paymentDatabase, paymentPublisher)
 	paymentUsecase := usecase.NewPaymentUsecase(paymentService)
-	paymentHandler := handler.NewPaymentHandler(paymentUsecase)
+	paymentHandler := handler.NewPaymentHandler(paymentUsecase, xenditUsecase, cfg.Xendit.XenditWebhookToken)
+
+	// order.created 컨슈머 기동 (내부에서 고루틴 실행)
+	kafka.StartOrderConsumer(cfg.Kafka.Broker, constant.KafkaTopicOrderCreated, func(event models.OrderCreatedEvent) {
+		if _, err := xenditUsecase.CreateInvoice(context.Background(), event); err != nil {
+			log.Logger.Error().Err(err).Msgf("Failed to create invoice for order_id: %d", event.OrderID)
+		}
+	})
 
 	port := cfg.App.Port
 	router := gin.Default()

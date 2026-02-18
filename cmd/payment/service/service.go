@@ -1,11 +1,12 @@
 package service
 
 import (
+	"context"
 	"paymentfc/cmd/payment/repository"
 )
 
 type PaymentService interface {
-	ProcessPaymentSuccess(orderID int64) error
+	ProcessPaymentSuccess(ctx context.Context, orderID int64) error
 }
 
 type paymentService struct {
@@ -20,7 +21,7 @@ func NewPaymentService(db repository.PaymentDatabase, publisher repository.Payme
 	}
 }
 
-func (s *paymentService) ProcessPaymentSuccess(orderID int64) error {
+func (s *paymentService) ProcessPaymentSuccess(ctx context.Context, orderID int64) error {
 	err := s.publisher.PublishPaymentSuccess(orderID)
 	if err != nil {
 		return err

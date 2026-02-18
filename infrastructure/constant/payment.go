@@ -5,3 +5,8 @@ const (
 	PaymentStatusFailed  = "FAILED"
 	PaymentStatusPending = "PENDING"
 )
+
+const (
+	KafkaTopicPaymentSuccess = "payment.success"
+	KafkaTopicOrderCreated   = "order.created"
+)

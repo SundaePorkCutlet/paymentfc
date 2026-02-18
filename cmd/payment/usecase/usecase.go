@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 	"paymentfc/cmd/payment/service"
 	"paymentfc/infrastructure/constant"
@@ -11,8 +12,8 @@ import (
 )
 
 type PaymentUsecase interface {
-	ProcessPaymentSuccess(orderID int64) error
-	ProcessPaymentWebhook(payload models.XenditWebhookPayload) error
+	ProcessPaymentSuccess(ctx context.Context, orderID int64) error
+	ProcessPaymentWebhook(ctx context.Context, payload models.XenditWebhookPayload) error
 }
 
 type paymentUsecase struct {
@@ -23,8 +24,8 @@ func NewPaymentUsecase(paymentService service.PaymentService) PaymentUsecase {
 	return &paymentUsecase{paymentService: paymentService}
 }
 
-func (u *paymentUsecase) ProcessPaymentSuccess(orderID int64) error {
-	return u.paymentService.ProcessPaymentSuccess(orderID)
+func (u *paymentUsecase) ProcessPaymentSuccess(ctx context.Context, orderID int64) error {
+	return u.paymentService.ProcessPaymentSuccess(ctx, orderID)
 }
 
 // extractOrderID extracts order ID from external ID (e.g. "order-123" -> 123)
@@ -37,7 +38,7 @@ func extractOrderID(externalID string) (int64, error) {
 	return orderID, nil
 }
 
-func (u *paymentUsecase) ProcessPaymentWebhook(payload models.XenditWebhookPayload) error {
+func (u *paymentUsecase) ProcessPaymentWebhook(ctx context.Context, payload models.XenditWebhookPayload) error {
 	switch payload.Status {
 	case constant.PaymentStatusPaid:
 		orderID, err := extractOrderID(payload.ExternalID)
@@ -45,7 +46,7 @@ func (u *paymentUsecase) ProcessPaymentWebhook(payload models.XenditWebhookPaylo
 			log.Logger.Error().Err(err).Msgf("Failed to extract order ID from external_id: %s", payload.ExternalID)
 			return err
 		}
-		return u.paymentService.ProcessPaymentSuccess(orderID)
+		return u.paymentService.ProcessPaymentSuccess(ctx, orderID)
 	case constant.PaymentStatusFailed:
 		// TODO: 결제 실패 처리
 	case constant.PaymentStatusPending:

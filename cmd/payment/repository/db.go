@@ -1,12 +1,15 @@
 package repository
 
 import (
+	"context"
 	"paymentfc/infrastructure/log"
+	"paymentfc/models"
 
 	"gorm.io/gorm"
 )
 
 type PaymentDatabase interface {
+	SavePayment(ctx context.Context, param *models.Payment) error
 	MarkPaid(orderID int64) error
 }
 
@@ -22,6 +25,14 @@ func NewPaymentDatabase(db *gorm.DB) PaymentDatabase {
 	return &paymentDatabase{
 		DB: db,
 	}
+}
+
+func (p *paymentDatabase) SavePayment(ctx context.Context, param *models.Payment) error {
+	if err := p.DB.WithContext(ctx).Table("payments").Create(param).Error; err != nil {
+		log.Logger.Error().Err(err).Msgf("Failed to save payment for order_id: %d", param.OrderID)
+		return err
+	}
+	return nil
 }
 
 func (p *paymentDatabase) MarkPaid(orderID int64) error {

@@ -14,6 +14,7 @@ func SetupRoutes(router *gin.Engine, paymentHandler *handler.PaymentHandler) {
 
 	// public API
 	router.GET("/ping", paymentHandler.Ping())
+	router.POST("/v1/payment/webhook", paymentHandler.HandleXenditWebhook)
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status":  "healthy",
@@ -25,6 +26,6 @@ func SetupRoutes(router *gin.Engine, paymentHandler *handler.PaymentHandler) {
 	private := router.Group("/api")
 	private.Use(middleware.AuthMiddleware(config.GetJwtSecret()))
 	{
-		// TODO: 결제 관련 API 추가
+		private.POST("/v1/payment/invoice", paymentHandler.CreateInvoice)
 	}
 }

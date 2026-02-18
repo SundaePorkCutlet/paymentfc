@@ -11,12 +11,3 @@ type Payment struct {
 	Status     string    `json:"status" gorm:"type:varchar"`
 	CreateTime time.Time `json:"create_time" gorm:"type:timestamp;default:CURRENT_TIMESTAMP"`
 }
-
-// OrderCreatedEvent ORDERFC에서 Kafka로 발행하는 이벤트 구조체
-type OrderCreatedEvent struct {
-	OrderID         int64   `json:"order_id"`
-	UserID          int64   `json:"user_id"`
-	TotalAmount     float64 `json:"total_amount"`
-	PaymentMethod   string  `json:"payment_method"`
-	ShippingAddress string  `json:"shipping_address"`
-}
