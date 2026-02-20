@@ -5,6 +5,7 @@ import (
 	"paymentfc/infrastructure/constant"
 	"paymentfc/infrastructure/log"
 	"paymentfc/models"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -16,6 +17,11 @@ type PaymentDatabase interface {
 	MarkPaid(orderID int64) error
 	IsAlreadyPaid(ctx context.Context, orderID int64) (bool, error)
 	GetPaymentByOrderID(ctx context.Context, orderID int64) (*models.Payment, error)
+	GetPendingInvoices(ctx context.Context) ([]models.Payment, error)
+	SavePaymentRequest(ctx context.Context, param *models.PaymentRequest) error
+	GetPendingPaymentRequests(ctx context.Context) ([]models.PaymentRequest, error)
+	UpdateSuccessPaymentRequest(ctx context.Context, paymentRequestID int64) error
+	UpdateFailedPaymentRequest(ctx context.Context, paymentRequestID int64, notes string) error
 }
 
 type paymentDatabase struct {
@@ -65,6 +71,15 @@ func (p *paymentDatabase) MarkPaid(orderID int64) error {
 	return nil
 }
 
+func (p *paymentDatabase) GetPendingInvoices(ctx context.Context) ([]models.Payment, error) {
+	var result []models.Payment
+	err := p.DB.Table("payments").WithContext(ctx).Where("status = ? AND create_time >= now() - interval '1 day'", constant.PaymentStatusPending).Find(&result).Error
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (p *paymentDatabase) IsAlreadyPaid(ctx context.Context, orderID int64) (bool, error) {
 	var result models.Payment
 	err := p.DB.Table("payments").WithContext(ctx).Where("order_id = ?", orderID).First(&result).Error
@@ -84,4 +99,48 @@ func (p *paymentDatabase) GetPaymentByOrderID(ctx context.Context, orderID int64
 		return nil, err
 	}
 	return &result, nil
+}
+
+func (p *paymentDatabase) SavePaymentRequest(ctx context.Context, param *models.PaymentRequest) error {
+	if err := p.DB.WithContext(ctx).Table("payment_requests").Create(param).Error; err != nil {
+		log.Logger.Error().Err(err).Msgf("Failed to save payment request for order_id: %d", param.OrderID)
+		return err
+	}
+	return nil
+}
+func (p *paymentDatabase) GetPendingPaymentRequests(ctx context.Context) ([]models.PaymentRequest, error) {
+	var result []models.PaymentRequest
+	err := p.DB.Table("payment_requests").WithContext(ctx).Where("status = ?", constant.PaymentStatusPending).Limit(5).Find(&result).Error
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (p *paymentDatabase) UpdateSuccessPaymentRequest(ctx context.Context, paymentRequestID int64) error {
+	err := p.DB.Table("payment_requests").Where("id = ?", paymentRequestID).Updates(
+		map[string]interface{}{
+			"status":      constant.PaymentStatusPaid,
+			"update_time": time.Now(),
+		}).Error
+	if err != nil {
+		log.Logger.Error().Err(err).Msgf("Failed to update payment request as success for payment_request_id: %d", paymentRequestID)
+		return err
+	}
+	return nil
+}
+
+func (p *paymentDatabase) UpdateFailedPaymentRequest(ctx context.Context, paymentRequestID int64, notes string) error {
+	err := p.DB.Table("payment_requests").Where("id = ?", paymentRequestID).Updates(
+		map[string]interface{}{
+			"status":      constant.PaymentStatusFailed,
+			"update_time": time.Now(),
+			"retry_count": gorm.Expr("retry_count + 1"),
+			"notes":       notes,
+		}).Error
+	if err != nil {
+		log.Logger.Error().Err(err).Msgf("Failed to update payment request as failed for payment_request_id: %d", paymentRequestID)
+		return err
+	}
+	return nil
 }

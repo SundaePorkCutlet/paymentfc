@@ -105,3 +105,58 @@ func (s *paymentService) RetryPublishPayment(max int, fn func() error) error {
 	}
 	return err
 }
+
+// --- PaymentRequest (same layer as Payment) ---
+
+type PaymentRequestService interface {
+	SavePaymentRequestFromEvent(ctx context.Context, event models.OrderCreatedEvent) error
+	ProcessBatch(ctx context.Context) error
+}
+
+type paymentRequestService struct {
+	database      repository.PaymentDatabase
+	xenditService XenditService
+}
+
+func NewPaymentRequestService(database repository.PaymentDatabase, xenditService XenditService) PaymentRequestService {
+	return &paymentRequestService{
+		database:      database,
+		xenditService: xenditService,
+	}
+}
+
+func (s *paymentRequestService) SavePaymentRequestFromEvent(ctx context.Context, event models.OrderCreatedEvent) error {
+	pr := &models.PaymentRequest{
+		OrderID:    event.OrderID,
+		UserID:     event.UserID,
+		Amount:     event.TotalAmount,
+		UserEmail:  "",
+		Status:     constant.PaymentStatusPending,
+		RetryCount:  0,
+	}
+	if err := s.database.SavePaymentRequest(ctx, pr); err != nil {
+		return err
+	}
+	log.Logger.Info().Int64("order_id", event.OrderID).Msg("Saved payment_request from order.created")
+	return nil
+}
+
+func (s *paymentRequestService) ProcessBatch(ctx context.Context) error {
+	list, err := s.database.GetPendingPaymentRequests(ctx)
+	if err != nil {
+		return err
+	}
+	for _, pr := range list {
+		_, err := s.xenditService.CreateInvoiceFromPaymentRequest(ctx, &pr)
+		if err != nil {
+			if updateErr := s.database.UpdateFailedPaymentRequest(ctx, pr.ID, err.Error()); updateErr != nil {
+				log.Logger.Error().Err(updateErr).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as failed")
+			}
+			continue
+		}
+		if err := s.database.UpdateSuccessPaymentRequest(ctx, pr.ID); err != nil {
+			log.Logger.Error().Err(err).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as success")
+		}
+	}
+	return nil
+}

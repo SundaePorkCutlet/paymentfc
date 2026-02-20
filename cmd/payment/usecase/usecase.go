@@ -17,12 +17,25 @@ type PaymentUsecase interface {
 	ProcessPaymentWebhook(ctx context.Context, payload models.XenditWebhookPayload) error
 }
 
+type PaymentRequestUsecase interface {
+	ProcessPaymentRequest(ctx context.Context, event models.OrderCreatedEvent) error
+	ProcessPaymentRequestBatch(ctx context.Context) error
+}
+
 type paymentUsecase struct {
 	paymentService service.PaymentService
 }
 
+type paymentRequestUsecase struct {
+	paymentRequestService service.PaymentRequestService
+}
+
 func NewPaymentUsecase(paymentService service.PaymentService) PaymentUsecase {
 	return &paymentUsecase{paymentService: paymentService}
+}
+
+func NewPaymentRequestUsecase(paymentRequestService service.PaymentRequestService) PaymentRequestUsecase {
+	return &paymentRequestUsecase{paymentRequestService: paymentRequestService}
 }
 
 func (u *paymentUsecase) ProcessPaymentSuccess(ctx context.Context, orderID int64) error {
@@ -85,4 +98,15 @@ func (u *paymentUsecase) ProcessPaymentWebhook(ctx context.Context, payload mode
 		log.Logger.Error().Msgf("Unknown webhook status: %s", payload.Status)
 	}
 	return nil
+}
+
+// --- PaymentRequest usecase (same file as Payment) ---
+
+// ProcessPaymentRequest handles order.created: save event to payment_requests (no invoice creation yet).
+func (u *paymentRequestUsecase) ProcessPaymentRequest(ctx context.Context, event models.OrderCreatedEvent) error {
+	return u.paymentRequestService.SavePaymentRequestFromEvent(ctx, event)
+}
+
+func (u *paymentRequestUsecase) ProcessPaymentRequestBatch(ctx context.Context) error {
+	return u.paymentRequestService.ProcessBatch(ctx)
 }

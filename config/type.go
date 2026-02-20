@@ -4,8 +4,14 @@ type Config struct {
 	App      AppConfig      `yaml:"app" validate:"required"`
 	Database DatabaseConfig `yaml:"database" validate:"required"`
 	Redis    RedisConfig    `yaml:"redis" validate:"required"`
-	Kafka    KafkaConfig    `yaml:"kafka" validate:"required"`
+	Kafka    KafkaConfig   `yaml:"kafka" validate:"required"`
 	Xendit   XenditConfig   `yaml:"xendit" validate:"required"`
+	Toggle   ToggleConfig   `yaml:"toggle"`
+}
+
+// ToggleConfig feature flags (실시간 인보이스 vs 배치)
+type ToggleConfig struct {
+	DisableCreateInvoiceDirectly bool `yaml:"disable_create_invoice_directly"` // true: payment_requests 저장만, 인보이스는 배치에서 생성
 }
 
 type XenditConfig struct {

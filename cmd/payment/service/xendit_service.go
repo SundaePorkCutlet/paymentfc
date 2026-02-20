@@ -12,6 +12,7 @@ import (
 
 type XenditService interface {
 	CreateInvoice(ctx context.Context, param models.OrderCreatedEvent) (*models.XenditInvoiceResponse, error)
+	CreateInvoiceFromPaymentRequest(ctx context.Context, pr *models.PaymentRequest) (*models.XenditInvoiceResponse, error)
 	CheckInvoiceStatus(ctx context.Context, externalID string) (string, error)
 }
 
@@ -52,6 +53,41 @@ func (s *xenditService) CreateInvoice(ctx context.Context, param models.OrderCre
 	}
 	if err := s.database.SavePayment(ctx, payment); err != nil {
 		log.Logger.Error().Err(err).Msgf("Failed to save payment for order: %d", param.OrderID)
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (s *xenditService) CreateInvoiceFromPaymentRequest(ctx context.Context, pr *models.PaymentRequest) (*models.XenditInvoiceResponse, error) {
+	externalID := fmt.Sprintf("order-%d", pr.OrderID)
+	payerEmail := pr.UserEmail
+	if payerEmail == "" {
+		payerEmail = fmt.Sprintf("user%d@test.com", pr.UserID)
+	}
+	req := models.XenditInvoiceRequest{
+		ExternalID:  externalID,
+		Amount:      pr.Amount,
+		Description: fmt.Sprintf("[FC] Pembayaran Order %d", pr.OrderID),
+		PayerEmail:  payerEmail,
+	}
+
+	resp, err := s.xendit.CreateInvoice(ctx, req)
+	if err != nil {
+		log.Logger.Error().Err(err).Msgf("Failed to create invoice for payment_request order_id: %d", pr.OrderID)
+		return nil, err
+	}
+
+	payment := &models.Payment{
+		OrderID:    pr.OrderID,
+		UserID:     pr.UserID,
+		ExternalID: externalID,
+		Amount:     pr.Amount,
+		Status:     constant.PaymentStatusPending,
+		CreateTime: time.Now(),
+	}
+	if err := s.database.SavePayment(ctx, payment); err != nil {
+		log.Logger.Error().Err(err).Msgf("Failed to save payment for order_id: %d", pr.OrderID)
 		return nil, err
 	}
 
