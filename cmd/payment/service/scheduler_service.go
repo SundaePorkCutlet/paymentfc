@@ -8,6 +8,8 @@ import (
 	"paymentfc/infrastructure/log"
 	"paymentfc/models"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type SchedulerService struct {
@@ -45,8 +47,8 @@ func (s *SchedulerService) StartCheckPendingInvoices() {
 	}()
 }
 
-// StartProcessPaymentRequests 주기적으로 PENDING payment_requests를 읽어 인보이스 생성 (배치). 강의 방식: 스케줄러 안에서 직접 DB·Xendit 호출.
-func (s *SchedulerService) StartProcessPaymentRequests() {
+// StartProcessPendingPaymentRequests 주기적으로 PENDING payment_requests를 읽어 인보이스 생성 (배치). 강의 방식: 스케줄러 안에서 직접 DB·Xendit 호출.
+func (s *SchedulerService) StartProcessPendingPaymentRequests() {
 	go func() {
 		for {
 			ctx := context.Background()
@@ -69,12 +71,34 @@ func (s *SchedulerService) StartProcessPaymentRequests() {
 				}
 				xenditReq := models.XenditInvoiceRequest{
 					ExternalID:  fmt.Sprintf("order-%d", pr.OrderID),
-					Amount:     pr.Amount,
+					Amount:      pr.Amount,
 					Description: fmt.Sprintf("[FC] Pembayaran Order %d", pr.OrderID),
-					PayerEmail: payerEmail,
+					PayerEmail:  payerEmail,
 				}
 
-				_, err := s.Xendit.CreateInvoice(ctx, xenditReq)
+				// payment가 이미 있는지 확인 (중복 인보이스 방지)
+				paymentInfo, err := s.Database.GetPaymentByOrderID(ctx, pr.OrderID)
+				if err != nil && err != gorm.ErrRecordNotFound {
+					// 실제 DB 에러면 스킵
+					log.Logger.Error().Err(err).Int64("order_id", pr.OrderID).Msg("Failed to get payment by order_id")
+					continue
+				}
+
+				// payment가 이미 있으면 (ID != 0)
+				if paymentInfo != nil && paymentInfo.ID != 0 {
+					if paymentInfo.Status == constant.PaymentStatusPaid {
+						log.Logger.Info().Int64("order_id", pr.OrderID).Msg("Payment already paid, skipping")
+					}
+					// 이미 인보이스 있음 → payment_request만 success 처리하고 스킵
+					if err := s.Database.UpdateSuccessPaymentRequest(ctx, pr.ID); err != nil {
+						log.Logger.Error().Err(err).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as success")
+					}
+					continue
+				}
+
+				// payment 없음 (ErrRecordNotFound) → 새로 인보이스 생성
+
+				_, err = s.Xendit.CreateInvoice(ctx, xenditReq)
 				if err != nil {
 					log.Logger.Error().Err(err).Int64("order_id", pr.OrderID).Msg("Failed to create invoice")
 					if updateErr := s.Database.UpdateFailedPaymentRequest(ctx, pr.ID, err.Error()); updateErr != nil {
@@ -83,7 +107,12 @@ func (s *SchedulerService) StartProcessPaymentRequests() {
 					continue
 				}
 
-				// 인보이스 생성 성공: payments 테이블에 저장 + payment_requests 상태 업데이트
+				// update status payment request success
+				if err := s.Database.UpdateSuccessPaymentRequest(ctx, pr.ID); err != nil {
+					log.Logger.Error().Err(err).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as success")
+				}
+
+				// save data to table 'payments'
 				payment := &models.Payment{
 					OrderID:    pr.OrderID,
 					UserID:     pr.UserID,
@@ -94,14 +123,11 @@ func (s *SchedulerService) StartProcessPaymentRequests() {
 				}
 				if err := s.Database.SavePayment(ctx, payment); err != nil {
 					log.Logger.Error().Err(err).Int64("order_id", pr.OrderID).Msg("Failed to save payment")
-					continue
 				}
-				if err := s.Database.UpdateSuccessPaymentRequest(ctx, pr.ID); err != nil {
-					log.Logger.Error().Err(err).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as success")
-				}
+
 			}
 
-			time.Sleep(1 * time.Minute) // 정상 처리 후 1분 대기
+			time.Sleep(5 * time.Second) // jeda 5 detik per setiap polling
 		}
 	}()
 }

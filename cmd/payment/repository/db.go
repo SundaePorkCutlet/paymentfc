@@ -20,8 +20,10 @@ type PaymentDatabase interface {
 	GetPendingInvoices(ctx context.Context) ([]models.Payment, error)
 	SavePaymentRequest(ctx context.Context, param *models.PaymentRequest) error
 	GetPendingPaymentRequests(ctx context.Context) ([]models.PaymentRequest, error)
+	GetFailedPaymentRequests(ctx context.Context) ([]models.PaymentRequest, error)
 	UpdateSuccessPaymentRequest(ctx context.Context, paymentRequestID int64) error
 	UpdateFailedPaymentRequest(ctx context.Context, paymentRequestID int64, notes string) error
+	UpdatePendingPaymentRequest(ctx context.Context, paymentRequestID int64) error
 }
 
 type paymentDatabase struct {
@@ -110,7 +112,16 @@ func (p *paymentDatabase) SavePaymentRequest(ctx context.Context, param *models.
 }
 func (p *paymentDatabase) GetPendingPaymentRequests(ctx context.Context) ([]models.PaymentRequest, error) {
 	var result []models.PaymentRequest
-	err := p.DB.Table("payment_requests").WithContext(ctx).Where("status = ?", constant.PaymentStatusPending).Limit(5).Find(&result).Error
+	err := p.DB.Table("payment_requests").WithContext(ctx).Where("status = ?", constant.PaymentStatusPending).Limit(5).Order("create_time ASC").Find(&result).Error
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (p *paymentDatabase) GetFailedPaymentRequests(ctx context.Context) ([]models.PaymentRequest, error) {
+	var result []models.PaymentRequest
+	err := p.DB.Table("payment_requests").WithContext(ctx).Where("status = ? AND retry_count <= ?", constant.PaymentStatusFailed, 3).Limit(5).Order("create_time ASC").Find(&result).Error
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +151,19 @@ func (p *paymentDatabase) UpdateFailedPaymentRequest(ctx context.Context, paymen
 		}).Error
 	if err != nil {
 		log.Logger.Error().Err(err).Msgf("Failed to update payment request as failed for payment_request_id: %d", paymentRequestID)
+		return err
+	}
+	return nil
+}
+
+func (p *paymentDatabase) UpdatePendingPaymentRequest(ctx context.Context, paymentRequestID int64) error {
+	err := p.DB.Table("payment_requests").Where("id = ?", paymentRequestID).Updates(
+		map[string]interface{}{
+			"status":      constant.PaymentStatusPending,
+			"update_time": time.Now(),
+		}).Error
+	if err != nil {
+		log.Logger.Error().Err(err).Msgf("Failed to update payment request as pending for payment_request_id: %d", paymentRequestID)
 		return err
 	}
 	return nil
