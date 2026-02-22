@@ -3,7 +3,7 @@ package resource
 import (
 	"fmt"
 	"paymentfc/config"
-	"paymentfc/infrastructure/log"
+	"paymentfc/log"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

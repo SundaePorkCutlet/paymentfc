@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"paymentfc/cmd/payment/service"
-	"paymentfc/infrastructure/constant"
-	"paymentfc/infrastructure/log"
+	"paymentfc/constant"
+	"paymentfc/log"
 	"paymentfc/models"
+	"paymentfc/pdf"
 	"strconv"
 	"strings"
 	"time"
@@ -15,27 +16,17 @@ import (
 type PaymentUsecase interface {
 	ProcessPaymentSuccess(ctx context.Context, orderID int64) error
 	ProcessPaymentWebhook(ctx context.Context, payload models.XenditWebhookPayload) error
-}
-
-type PaymentRequestUsecase interface {
 	ProcessPaymentRequest(ctx context.Context, event models.OrderCreatedEvent) error
 	ProcessPaymentRequestBatch(ctx context.Context) error
+	DownloadInvoicePdf(ctx context.Context, orderID int64) (string, error)
 }
 
 type paymentUsecase struct {
 	paymentService service.PaymentService
 }
 
-type paymentRequestUsecase struct {
-	paymentRequestService service.PaymentRequestService
-}
-
 func NewPaymentUsecase(paymentService service.PaymentService) PaymentUsecase {
 	return &paymentUsecase{paymentService: paymentService}
-}
-
-func NewPaymentRequestUsecase(paymentRequestService service.PaymentRequestService) PaymentRequestUsecase {
-	return &paymentRequestUsecase{paymentRequestService: paymentRequestService}
 }
 
 func (u *paymentUsecase) ProcessPaymentSuccess(ctx context.Context, orderID int64) error {
@@ -100,13 +91,24 @@ func (u *paymentUsecase) ProcessPaymentWebhook(ctx context.Context, payload mode
 	return nil
 }
 
-// --- PaymentRequest usecase (same file as Payment) ---
-
 // ProcessPaymentRequest handles order.created: save event to payment_requests (no invoice creation yet).
-func (u *paymentRequestUsecase) ProcessPaymentRequest(ctx context.Context, event models.OrderCreatedEvent) error {
-	return u.paymentRequestService.SavePaymentRequestFromEvent(ctx, event)
+func (u *paymentUsecase) ProcessPaymentRequest(ctx context.Context, event models.OrderCreatedEvent) error {
+	return u.paymentService.SavePaymentRequestFromEvent(ctx, event)
 }
 
-func (u *paymentRequestUsecase) ProcessPaymentRequestBatch(ctx context.Context) error {
-	return u.paymentRequestService.ProcessBatch(ctx)
+func (u *paymentUsecase) ProcessPaymentRequestBatch(ctx context.Context) error {
+	return u.paymentService.ProcessBatch(ctx)
+}
+
+func (u *paymentUsecase) DownloadInvoicePdf(ctx context.Context, orderID int64) (string, error) {
+	payment, err := u.paymentService.GetPaymentByOrderID(ctx, orderID)
+	if err != nil {
+		return "", err
+	}
+
+	filePath := fmt.Sprintf("/go-commerce/invoice_%d.pdf", orderID)
+	if err := pdf.GenerateInvoicePdf(payment, filePath); err != nil {
+		return "", err
+	}
+	return filePath, nil
 }

@@ -2,7 +2,7 @@ package kafka
 
 import (
 	"context"
-	"paymentfc/infrastructure/log"
+	"paymentfc/log"
 
 	"github.com/segmentio/kafka-go"
 )

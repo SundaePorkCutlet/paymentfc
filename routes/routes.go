@@ -27,5 +27,6 @@ func SetupRoutes(router *gin.Engine, paymentHandler *handler.PaymentHandler) {
 	private.Use(middleware.AuthMiddleware(config.GetJwtSecret()))
 	{
 		private.POST("/v1/payment/invoice", paymentHandler.CreateInvoice)
+		private.GET("/v1/invoice/:order_id/pdf", paymentHandler.HandleDownloadInvoicePdf)
 	}
 }

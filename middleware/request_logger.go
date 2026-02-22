@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"context"
-	"paymentfc/infrastructure/log"
+	"paymentfc/log"
 	"time"
 
 	"github.com/gin-gonic/gin"

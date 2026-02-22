@@ -8,8 +8,8 @@ import (
 	"paymentfc/cmd/payment/service"
 	"paymentfc/cmd/payment/usecase"
 	"paymentfc/config"
-	"paymentfc/infrastructure/constant"
-	"paymentfc/infrastructure/log"
+	"paymentfc/constant"
+	"paymentfc/log"
 	"paymentfc/kafka"
 	"paymentfc/models"
 	"paymentfc/routes"
@@ -27,7 +27,10 @@ func main() {
 
 	log.SetupLogger()
 
+	log.Logger.Info().Bool("disable_create_invoice_directly", cfg.Toggle.DisableCreateInvoiceDirectly).Msg("Toggle config loaded")
+
 	db := resource.InitDB(cfg.Database)
+	mongoDB := resource.InitMongo(cfg.Mongo)
 
 	// AutoMigrate: payment, payment_anomalies, failed_events, payment_requests 테이블 자동 생성/업데이트
 	if err := db.AutoMigrate(&models.Payment{}, &models.PaymentAnomaly{}, &models.FailedEvent{}, &models.PaymentRequest{}); err != nil {
@@ -46,14 +49,13 @@ func main() {
 	// 의존성 주입
 	paymentDatabase := repository.NewPaymentDatabase(db)
 	paymentPublisher := repository.NewKafkaPublisher(kafkaWriter)
+	auditLogRepo := repository.NewAuditLogRepository(mongoDB)
 	xenditClient := repository.NewXenditClient(cfg.Xendit.XenditAPIKey)
 	xenditService := service.NewXenditService(paymentDatabase, xenditClient)
 	xenditUsecase := usecase.NewXenditUsecase(xenditService)
 
-	paymentService := service.NewPaymentService(paymentDatabase, paymentPublisher)
+	paymentService := service.NewPaymentService(paymentDatabase, paymentPublisher, xenditService, auditLogRepo)
 	paymentUsecase := usecase.NewPaymentUsecase(paymentService)
-	paymentRequestService := service.NewPaymentRequestService(paymentDatabase, xenditService)
-	paymentRequestUsecase := usecase.NewPaymentRequestUsecase(paymentRequestService)
 	paymentHandler := handler.NewPaymentHandler(paymentUsecase, xenditUsecase, cfg.Xendit.XenditWebhookToken)
 
 	scheduler := service.SchedulerService{
@@ -61,6 +63,7 @@ func main() {
 		Xendit:         xenditClient,
 		Publisher:      paymentPublisher,
 		PaymentService: paymentService,
+		AuditLog:       auditLogRepo,
 	}
 	scheduler.StartCheckPendingInvoices()
 	scheduler.StartProcessPendingPaymentRequests()
@@ -72,7 +75,7 @@ func main() {
 		ctx := context.Background()
 		if cfg.Toggle.DisableCreateInvoiceDirectly {
 			// 배치 방식: 저장만, 인보이스는 배치에서 생성
-			if err := paymentRequestUsecase.ProcessPaymentRequest(ctx, event); err != nil {
+			if err := paymentUsecase.ProcessPaymentRequest(ctx, event); err != nil {
 				log.Logger.Error().Err(err).Msgf("Failed to process payment request for order_id: %d", event.OrderID)
 			}
 		} else {

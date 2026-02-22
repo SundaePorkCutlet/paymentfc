@@ -5,7 +5,7 @@ const (
 )
 
 const (
-	PaymentAnomalyStatusSuccess   = 1
-	PaymentAnomalyStatusRetry     = 2
+	PaymentAnomalyStatusSuccess     = 1
+	PaymentAnomalyStatusRetry       = 2
 	PaymentAnomalyStatusNeedToCheck = 99
 )

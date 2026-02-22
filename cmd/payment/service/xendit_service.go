@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"paymentfc/cmd/payment/repository"
-	"paymentfc/infrastructure/constant"
-	"paymentfc/infrastructure/log"
+	"paymentfc/constant"
+	"paymentfc/log"
 	"paymentfc/models"
 	"time"
 )

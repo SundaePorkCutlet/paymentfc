@@ -3,7 +3,7 @@ package kafka
 import (
 	"context"
 	"encoding/json"
-	"paymentfc/infrastructure/log"
+	"paymentfc/log"
 	"paymentfc/models"
 
 	"github.com/segmentio/kafka-go"

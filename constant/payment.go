@@ -4,6 +4,7 @@ const (
 	PaymentStatusPaid    = "PAID"
 	PaymentStatusFailed  = "FAILED"
 	PaymentStatusPending = "PENDING"
+	PaymentStatusExpired = "EXPIRED"
 )
 
 const (

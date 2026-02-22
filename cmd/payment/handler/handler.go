@@ -3,22 +3,23 @@ package handler
 import (
 	"net/http"
 	"paymentfc/cmd/payment/usecase"
-	"paymentfc/infrastructure/log"
+	"paymentfc/log"
 	"paymentfc/models"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
 type PaymentHandler struct {
-	PaymentUsecase    usecase.PaymentUsecase
-	XenditUsecase     usecase.XenditUsecase
+	PaymentUsecase     usecase.PaymentUsecase
+	XenditUsecase      usecase.XenditUsecase
 	XenditWebhookToken string
 }
 
 func NewPaymentHandler(paymentUsecase usecase.PaymentUsecase, xenditUsecase usecase.XenditUsecase, xenditWebhookToken string) *PaymentHandler {
 	return &PaymentHandler{
-		PaymentUsecase:    paymentUsecase,
-		XenditUsecase:     xenditUsecase,
+		PaymentUsecase:     paymentUsecase,
+		XenditUsecase:      xenditUsecase,
 		XenditWebhookToken: xenditWebhookToken,
 	}
 }
@@ -74,4 +75,24 @@ func (h *PaymentHandler) CreateInvoice(c *gin.Context) {
 		"invoice_url": resp.InvoiceURL,
 		"status":      resp.Status,
 	})
+}
+
+func (h *PaymentHandler) HandleDownloadInvoicePdf(c *gin.Context) {
+	orderIdStr := c.Param("order_id")
+
+	orderIdInt, err := strconv.ParseInt(orderIdStr, 10, 64)
+	if err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to parse order id")
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	filePath, err := h.PaymentUsecase.DownloadInvoicePdf(c.Request.Context(), orderIdInt)
+	if err != nil {
+		log.Logger.Error().Err(err).Msgf("Failed to get payment by order id: %d", orderIdInt)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.FileAttachment(filePath, filePath)
 }

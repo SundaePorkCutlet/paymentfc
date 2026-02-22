@@ -27,6 +27,10 @@ xendit:
   secret_api_key: ""
   webhook_token: ""
 
+mongo:
+  uri: mongodb://admin:admin@localhost:27017
+  database: payment_audit
+
 # true: order.created 시 인보이스 직접 생성 안 함 → payment_requests 저장만, 배치에서 인보이스 생성
 # false: order.created 시 바로 CreateInvoice (실시간)
 toggle:

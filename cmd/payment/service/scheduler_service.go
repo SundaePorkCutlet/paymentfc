@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"paymentfc/cmd/payment/repository"
-	"paymentfc/infrastructure/constant"
-	"paymentfc/infrastructure/log"
+	"paymentfc/constant"
+	"paymentfc/log"
 	"paymentfc/models"
 	"time"
 
@@ -17,6 +17,7 @@ type SchedulerService struct {
 	Xendit         repository.XenditClient
 	Publisher      repository.PaymentEventPublisher
 	PaymentService PaymentService
+	AuditLog       repository.AuditLogRepository
 }
 
 func (s *SchedulerService) StartSweepingExpiredPendingPayments() {
@@ -32,6 +33,14 @@ func (s *SchedulerService) StartSweepingExpiredPendingPayments() {
 			for _, payment := range pendingExpiredPayments {
 				if markErr := s.Database.MarkExpired(ctx, payment.ID); markErr != nil {
 					log.Logger.Error().Err(markErr).Int64("payment_id", payment.ID).Msg("Failed to mark payment as expired")
+				} else {
+					s.AuditLog.SaveAuditLog(ctx, &models.PaymentAuditLog{
+						OrderID:    payment.OrderID,
+						PaymentID:  payment.ID,
+						ExternalID: payment.ExternalID,
+						Event:      "PAYMENT_EXPIRED",
+						Actor:      "expired_sweeper",
+					})
 				}
 			}
 			time.Sleep(1 * time.Minute)
@@ -62,6 +71,15 @@ func (s *SchedulerService) StartProcessFailedPaymentRequests() {
 					}
 					continue
 				}
+				s.AuditLog.SaveAuditLog(ctx, &models.PaymentAuditLog{
+					OrderID: pr.OrderID,
+					UserID:  pr.UserID,
+					Event:   "PAYMENT_REQUEST_RETRY",
+					Actor:   "failed_request_processor",
+					Metadata: map[string]any{
+						"retry_count": pr.RetryCount,
+					},
+				})
 			}
 
 			time.Sleep(1 * time.Minute)
@@ -152,6 +170,15 @@ func (s *SchedulerService) StartProcessPendingPaymentRequests() {
 				xenditInvoiceInfo, err := s.Xendit.CreateInvoice(ctx, xenditReq)
 				if err != nil {
 					log.Logger.Error().Err(err).Int64("order_id", pr.OrderID).Msg("Failed to create invoice")
+					s.AuditLog.SaveAuditLog(ctx, &models.PaymentAuditLog{
+						OrderID: pr.OrderID,
+						UserID:  pr.UserID,
+						Event:   "INVOICE_CREATION_FAILED",
+						Actor:   "pending_request_processor",
+						Metadata: map[string]any{
+							"error": err.Error(),
+						},
+					})
 					if updateErr := s.Database.UpdateFailedPaymentRequest(ctx, pr.ID, err.Error()); updateErr != nil {
 						log.Logger.Error().Err(updateErr).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as failed")
 					}
@@ -175,6 +202,19 @@ func (s *SchedulerService) StartProcessPendingPaymentRequests() {
 				}
 				if err := s.Database.SavePayment(ctx, payment); err != nil {
 					log.Logger.Error().Err(err).Int64("order_id", pr.OrderID).Msg("Failed to save payment")
+				} else {
+					s.AuditLog.SaveAuditLog(ctx, &models.PaymentAuditLog{
+						OrderID:    pr.OrderID,
+						PaymentID:  payment.ID,
+						UserID:     pr.UserID,
+						ExternalID: xenditReq.ExternalID,
+						Event:      "INVOICE_CREATED",
+						Actor:      "pending_request_processor",
+						Metadata: map[string]any{
+							"amount":     pr.Amount,
+							"invoice_id": xenditInvoiceInfo.ID,
+						},
+					})
 				}
 
 			}

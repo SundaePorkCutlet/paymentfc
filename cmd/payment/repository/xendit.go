@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"paymentfc/infrastructure/log"
+	"paymentfc/log"
 	"paymentfc/models"
 )
 

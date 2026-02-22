@@ -5,7 +5,7 @@ const (
 )
 
 const (
-	FailedPublishEventStatusSuccess   = 1
-	FailedPublishEventStatusRetry     = 2
+	FailedPublishEventStatusSuccess     = 1
+	FailedPublishEventStatusRetry       = 2
 	FailedPublishEventStatusNeedToCheck = 99
 )
