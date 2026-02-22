@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type XenditInvoiceRequest struct {
 	ExternalID  string  `json:"external_id"`
 	Amount      float64 `json:"amount"`
@@ -8,7 +10,8 @@ type XenditInvoiceRequest struct {
 }
 
 type XenditInvoiceResponse struct {
-	ID         string `json:"id"`
-	InvoiceURL string `json:"invoice_url"`
-	Status     string `json:"status"`
+	ID         string    `json:"id"`
+	ExpireDate time.Time `json:"expire_date"`
+	InvoiceURL string    `json:"invoice_url"`
+	Status     string    `json:"status"`
 }

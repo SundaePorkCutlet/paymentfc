@@ -3,11 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 	"paymentfc/cmd/payment/repository"
 	"paymentfc/infrastructure/constant"
 	"paymentfc/infrastructure/log"
 	"paymentfc/models"
+	"time"
 )
 
 type XenditService interface {
@@ -37,26 +37,27 @@ func (s *xenditService) CreateInvoice(ctx context.Context, param models.OrderCre
 		PayerEmail:  fmt.Sprintf("user%d@test.com", param.UserID),
 	}
 
-	resp, err := s.xendit.CreateInvoice(ctx, req)
+	xenditInvoiceInfo, err := s.xendit.CreateInvoice(ctx, req)
 	if err != nil {
 		log.Logger.Error().Err(err).Msgf("Failed to create invoice for order: %d", param.OrderID)
 		return nil, err
 	}
 
 	payment := &models.Payment{
-		OrderID:    param.OrderID,
-		UserID:     param.UserID,
-		ExternalID: externalID,
-		Amount:     param.TotalAmount,
-		Status:     constant.PaymentStatusPending,
-		CreateTime: time.Now(),
+		OrderID:     param.OrderID,
+		UserID:      param.UserID,
+		ExternalID:  externalID,
+		Amount:      param.TotalAmount,
+		Status:      constant.PaymentStatusPending,
+		CreateTime:  time.Now(),
+		ExpiredTime: xenditInvoiceInfo.ExpireDate,
 	}
 	if err := s.database.SavePayment(ctx, payment); err != nil {
 		log.Logger.Error().Err(err).Msgf("Failed to save payment for order: %d", param.OrderID)
 		return nil, err
 	}
 
-	return resp, nil
+	return xenditInvoiceInfo, nil
 }
 
 func (s *xenditService) CreateInvoiceFromPaymentRequest(ctx context.Context, pr *models.PaymentRequest) (*models.XenditInvoiceResponse, error) {

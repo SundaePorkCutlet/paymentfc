@@ -19,6 +19,57 @@ type SchedulerService struct {
 	PaymentService PaymentService
 }
 
+func (s *SchedulerService) StartSweepingExpiredPendingPayments() {
+	go func() {
+		for {
+			ctx := context.Background()
+			pendingExpiredPayments, err := s.Database.GetExpiredPendingPayments(ctx)
+			if err != nil && err != gorm.ErrRecordNotFound {
+				log.Logger.Error().Err(err).Msg("Failed to get expired pending payments")
+				time.Sleep(5 * time.Second) // DB 이슈 시 잠시 대기 후 재시도
+				continue
+			}
+			for _, payment := range pendingExpiredPayments {
+				if markErr := s.Database.MarkExpired(ctx, payment.ID); markErr != nil {
+					log.Logger.Error().Err(markErr).Int64("payment_id", payment.ID).Msg("Failed to mark payment as expired")
+				}
+			}
+			time.Sleep(1 * time.Minute)
+		}
+	}()
+}
+
+func (s *SchedulerService) StartProcessFailedPaymentRequests() {
+	go func() {
+		for {
+			ctx := context.Background()
+			pendingPaymentRequests, err := s.Database.GetFailedPaymentRequests(ctx)
+			if err != nil {
+				log.Logger.Error().Err(err).Msg("Failed to get failed payment requests")
+
+				time.Sleep(5 * time.Second) // DB 이슈 시 잠시 대기 후 재시도
+				continue
+			}
+
+			for _, pr := range pendingPaymentRequests {
+				updateErr := s.Database.UpdatePendingPaymentRequest(ctx, pr.ID)
+				if updateErr != nil {
+					log.Logger.Error().Err(updateErr).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as pending")
+
+					err := s.Database.UpdateFailedPaymentRequest(ctx, pr.ID, updateErr.Error())
+					if err != nil {
+						log.Logger.Error().Err(err).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as failed")
+					}
+					continue
+				}
+			}
+
+			time.Sleep(1 * time.Minute)
+		}
+
+	}()
+}
+
 func (s *SchedulerService) StartCheckPendingInvoices() {
 	ticker := time.NewTicker(10 * time.Minute)
 
@@ -98,7 +149,7 @@ func (s *SchedulerService) StartProcessPendingPaymentRequests() {
 
 				// payment 없음 (ErrRecordNotFound) → 새로 인보이스 생성
 
-				_, err = s.Xendit.CreateInvoice(ctx, xenditReq)
+				xenditInvoiceInfo, err := s.Xendit.CreateInvoice(ctx, xenditReq)
 				if err != nil {
 					log.Logger.Error().Err(err).Int64("order_id", pr.OrderID).Msg("Failed to create invoice")
 					if updateErr := s.Database.UpdateFailedPaymentRequest(ctx, pr.ID, err.Error()); updateErr != nil {
@@ -114,12 +165,13 @@ func (s *SchedulerService) StartProcessPendingPaymentRequests() {
 
 				// save data to table 'payments'
 				payment := &models.Payment{
-					OrderID:    pr.OrderID,
-					UserID:     pr.UserID,
-					ExternalID: xenditReq.ExternalID,
-					Amount:     pr.Amount,
-					Status:     constant.PaymentStatusPending,
-					CreateTime: time.Now(),
+					OrderID:     pr.OrderID,
+					UserID:      pr.UserID,
+					ExternalID:  xenditReq.ExternalID,
+					Amount:      pr.Amount,
+					Status:      constant.PaymentStatusPending,
+					CreateTime:  time.Now(),
+					ExpiredTime: xenditInvoiceInfo.ExpireDate,
 				}
 				if err := s.Database.SavePayment(ctx, payment); err != nil {
 					log.Logger.Error().Err(err).Int64("order_id", pr.OrderID).Msg("Failed to save payment")

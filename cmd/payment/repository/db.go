@@ -24,6 +24,8 @@ type PaymentDatabase interface {
 	UpdateSuccessPaymentRequest(ctx context.Context, paymentRequestID int64) error
 	UpdateFailedPaymentRequest(ctx context.Context, paymentRequestID int64, notes string) error
 	UpdatePendingPaymentRequest(ctx context.Context, paymentRequestID int64) error
+	GetExpiredPendingPayments(ctx context.Context) ([]models.Payment, error)
+	MarkExpired(ctx context.Context, paymentID int64) error
 }
 
 type paymentDatabase struct {
@@ -164,6 +166,28 @@ func (p *paymentDatabase) UpdatePendingPaymentRequest(ctx context.Context, payme
 		}).Error
 	if err != nil {
 		log.Logger.Error().Err(err).Msgf("Failed to update payment request as pending for payment_request_id: %d", paymentRequestID)
+		return err
+	}
+	return nil
+}
+
+func (p *paymentDatabase) GetExpiredPendingPayments(ctx context.Context) ([]models.Payment, error) {
+	var result []models.Payment
+	err := p.DB.Table("payments").WithContext(ctx).Where("status = ? AND expired_time < now()", constant.PaymentStatusPending).Find(&result).Error
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (p *paymentDatabase) MarkExpired(ctx context.Context, paymentID int64) error {
+	err := p.DB.Table("payments").Where("id = ?", paymentID).Updates(
+		map[string]interface{}{
+			"status":      constant.PaymentStatusExpired,
+			"update_time": time.Now(),
+		}).Error
+	if err != nil {
+		log.Logger.Error().Err(err).Int64("payment_id", paymentID).Msg("Failed to mark payment as expired")
 		return err
 	}
 	return nil

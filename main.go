@@ -64,6 +64,8 @@ func main() {
 	}
 	scheduler.StartCheckPendingInvoices()
 	scheduler.StartProcessPendingPaymentRequests()
+	scheduler.StartProcessFailedPaymentRequests()
+	scheduler.StartSweepingExpiredPendingPayments()
 
 	// order.created 컨슈머: toggle에 따라 실시간 인보이스 vs payment_requests 저장만
 	kafka.StartOrderConsumer(cfg.Kafka.Broker, constant.KafkaTopicOrderCreated, func(event models.OrderCreatedEvent) {
