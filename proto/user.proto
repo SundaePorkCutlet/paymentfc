@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "paymentfc/pb";
+
+// UserService provides user-related gRPC methods for inter-service communication
+service UserService {
+  // GetUserInfoByUserId returns user information by user ID
+  rpc GetUserInfoByUserId(GetUserInfoByUserIdRequest) returns (GetUserInfoByUserIdResponse);
+  
+  // ValidateToken validates JWT token and returns user info
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+}
+
+message GetUserInfoByUserIdRequest {
+  int64 user_id = 1;
+}
+
+message GetUserInfoByUserIdResponse {
+  int64 id = 1;
+  string email = 2;
+  string name = 3;
+  string role = 4;
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  int64 user_id = 2;
+  string email = 3;
+  string error = 4;
+}

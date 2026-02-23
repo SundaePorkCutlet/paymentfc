@@ -8,6 +8,11 @@ type Config struct {
 	Xendit   XenditConfig   `yaml:"xendit" validate:"required"`
 	Mongo    MongoConfig    `yaml:"mongo"`
 	Toggle   ToggleConfig   `yaml:"toggle"`
+	GRPC     GRPCConfig     `yaml:"grpc"`
+}
+
+type GRPCConfig struct {
+	UserServiceAddr string `yaml:"user_service_addr" mapstructure:"user_service_addr"`
 }
 
 // ToggleConfig feature flags (실시간 인보이스 vs 배치)

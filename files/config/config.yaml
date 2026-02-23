@@ -35,3 +35,6 @@ mongo:
 # false: order.created 시 바로 CreateInvoice (실시간)
 toggle:
   disable_create_invoice_directly: true
+
+grpc:
+  user_service_addr: userfc:50051

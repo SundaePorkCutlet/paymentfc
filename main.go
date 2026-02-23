@@ -9,8 +9,9 @@ import (
 	"paymentfc/cmd/payment/usecase"
 	"paymentfc/config"
 	"paymentfc/constant"
-	"paymentfc/log"
+	usergrpc "paymentfc/grpc"
 	"paymentfc/kafka"
+	"paymentfc/log"
 	"paymentfc/models"
 	"paymentfc/routes"
 
@@ -32,6 +33,14 @@ func main() {
 	db := resource.InitDB(cfg.Database)
 	mongoDB := resource.InitMongo(cfg.Mongo)
 
+	userClient, err := usergrpc.NewUserClient(cfg.GRPC.UserServiceAddr)
+	if err != nil {
+		log.Logger.Warn().Err(err).Msg("Failed to connect to user gRPC service - continuing without user service")
+	} else {
+		defer userClient.Close()
+		log.Logger.Info().Str("addr", cfg.GRPC.UserServiceAddr).Msg("User gRPC client initialized")
+	}
+
 	// AutoMigrate: payment, payment_anomalies, failed_events, payment_requests 테이블 자동 생성/업데이트
 	if err := db.AutoMigrate(&models.Payment{}, &models.PaymentAnomaly{}, &models.FailedEvent{}, &models.PaymentRequest{}); err != nil {
 		log.Logger.Fatal().Err(err).Msg("Failed to migrate database")
@@ -51,7 +60,7 @@ func main() {
 	paymentPublisher := repository.NewKafkaPublisher(kafkaWriter)
 	auditLogRepo := repository.NewAuditLogRepository(mongoDB)
 	xenditClient := repository.NewXenditClient(cfg.Xendit.XenditAPIKey)
-	xenditService := service.NewXenditService(paymentDatabase, xenditClient)
+	xenditService := service.NewXenditService(paymentDatabase, xenditClient, userClient)
 	xenditUsecase := usecase.NewXenditUsecase(xenditService)
 
 	paymentService := service.NewPaymentService(paymentDatabase, paymentPublisher, xenditService, auditLogRepo)
@@ -64,6 +73,7 @@ func main() {
 		Publisher:      paymentPublisher,
 		PaymentService: paymentService,
 		AuditLog:       auditLogRepo,
+		UserClient:     userClient,
 	}
 	scheduler.StartCheckPendingInvoices()
 	scheduler.StartProcessPendingPaymentRequests()

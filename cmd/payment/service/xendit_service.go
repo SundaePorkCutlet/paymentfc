@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"paymentfc/cmd/payment/repository"
 	"paymentfc/constant"
+	usergrpc "paymentfc/grpc"
 	"paymentfc/log"
 	"paymentfc/models"
 	"time"
@@ -17,24 +18,36 @@ type XenditService interface {
 }
 
 type xenditService struct {
-	database repository.PaymentDatabase
-	xendit   repository.XenditClient
+	database   repository.PaymentDatabase
+	xendit     repository.XenditClient
+	userClient *usergrpc.UserClient
 }
 
-func NewXenditService(database repository.PaymentDatabase, xenditClient repository.XenditClient) XenditService {
+func NewXenditService(database repository.PaymentDatabase, xenditClient repository.XenditClient, userClient *usergrpc.UserClient) XenditService {
 	return &xenditService{
-		database: database,
-		xendit:   xenditClient,
+		database:   database,
+		xendit:     xenditClient,
+		userClient: userClient,
 	}
 }
 
 func (s *xenditService) CreateInvoice(ctx context.Context, param models.OrderCreatedEvent) (*models.XenditInvoiceResponse, error) {
 	externalID := fmt.Sprintf("order-%d", param.OrderID)
+
+	if s.userClient == nil {
+		return nil, fmt.Errorf("user gRPC client is not initialized")
+	}
+	userInfo, err := s.userClient.GetUserInfoByUserId(ctx, param.UserID)
+	if err != nil {
+		log.Logger.Error().Err(err).Int64("user_id", param.UserID).Msg("Failed to get user info via gRPC")
+		return nil, fmt.Errorf("failed to get user info: %w", err)
+	}
+	payerEmail := userInfo.Email
 	req := models.XenditInvoiceRequest{
 		ExternalID:  externalID,
 		Amount:      param.TotalAmount,
 		Description: fmt.Sprintf("[FC] Pembayaran Order %d", param.OrderID),
-		PayerEmail:  fmt.Sprintf("user%d@test.com", param.UserID),
+		PayerEmail:  payerEmail,
 	}
 
 	xenditInvoiceInfo, err := s.xendit.CreateInvoice(ctx, req)
@@ -64,7 +77,15 @@ func (s *xenditService) CreateInvoiceFromPaymentRequest(ctx context.Context, pr 
 	externalID := fmt.Sprintf("order-%d", pr.OrderID)
 	payerEmail := pr.UserEmail
 	if payerEmail == "" {
-		payerEmail = fmt.Sprintf("user%d@test.com", pr.UserID)
+		if s.userClient == nil {
+			return nil, fmt.Errorf("user gRPC client is not initialized")
+		}
+		userInfo, err := s.userClient.GetUserInfoByUserId(ctx, pr.UserID)
+		if err != nil {
+			log.Logger.Error().Err(err).Int64("user_id", pr.UserID).Msg("Failed to get user info via gRPC")
+			return nil, fmt.Errorf("failed to get user info: %w", err)
+		}
+		payerEmail = userInfo.Email
 	}
 	req := models.XenditInvoiceRequest{
 		ExternalID:  externalID,

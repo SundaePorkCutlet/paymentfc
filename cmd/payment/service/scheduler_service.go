@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"paymentfc/cmd/payment/repository"
 	"paymentfc/constant"
+	usergrpc "paymentfc/grpc"
 	"paymentfc/log"
 	"paymentfc/models"
 	"time"
@@ -18,6 +19,7 @@ type SchedulerService struct {
 	Publisher      repository.PaymentEventPublisher
 	PaymentService PaymentService
 	AuditLog       repository.AuditLogRepository
+	UserClient     *usergrpc.UserClient
 }
 
 func (s *SchedulerService) StartSweepingExpiredPendingPayments() {
@@ -134,10 +136,23 @@ func (s *SchedulerService) StartProcessPendingPaymentRequests() {
 			for _, pr := range paymentRequests {
 				log.Logger.Debug().Int64("order_id", pr.OrderID).Msg("Processing payment request")
 
-				payerEmail := pr.UserEmail
-				if payerEmail == "" {
-					payerEmail = fmt.Sprintf("user%d@test.com", pr.UserID)
+			payerEmail := pr.UserEmail
+			if payerEmail == "" {
+				if s.UserClient == nil {
+					log.Logger.Error().Int64("order_id", pr.OrderID).Msg("User gRPC client is not initialized, skipping")
+					continue
 				}
+				userInfo, err := s.UserClient.GetUserInfoByUserId(ctx, pr.UserID)
+				if err != nil {
+					log.Logger.Error().Err(err).Int64("user_id", pr.UserID).Msg("Failed to get user info via gRPC")
+					if updateErr := s.Database.UpdateFailedPaymentRequest(ctx, pr.ID, "failed to get user email"); updateErr != nil {
+						log.Logger.Error().Err(updateErr).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as failed")
+					}
+					continue
+				}
+				payerEmail = userInfo.Email
+				log.Logger.Info().Int64("user_id", pr.UserID).Str("email", payerEmail).Msg("Got user email via gRPC")
+			}
 				xenditReq := models.XenditInvoiceRequest{
 					ExternalID:  fmt.Sprintf("order-%d", pr.OrderID),
 					Amount:      pr.Amount,
