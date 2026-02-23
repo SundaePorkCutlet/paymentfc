@@ -20,10 +20,10 @@ type XenditService interface {
 type xenditService struct {
 	database   repository.PaymentDatabase
 	xendit     repository.XenditClient
-	userClient *usergrpc.UserClient
+	userClient usergrpc.UserClientInterface
 }
 
-func NewXenditService(database repository.PaymentDatabase, xenditClient repository.XenditClient, userClient *usergrpc.UserClient) XenditService {
+func NewXenditService(database repository.PaymentDatabase, xenditClient repository.XenditClient, userClient usergrpc.UserClientInterface) XenditService {
 	return &xenditService{
 		database:   database,
 		xendit:     xenditClient,

@@ -38,3 +38,8 @@ toggle:
 
 grpc:
   user_service_addr: userfc:50051
+
+vault:
+  host: http://vault:8200
+  token: fcproject
+  path: paymentfc

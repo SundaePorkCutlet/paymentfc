@@ -17,7 +17,6 @@ type PaymentUsecase interface {
 	ProcessPaymentSuccess(ctx context.Context, orderID int64) error
 	ProcessPaymentWebhook(ctx context.Context, payload models.XenditWebhookPayload) error
 	ProcessPaymentRequest(ctx context.Context, event models.OrderCreatedEvent) error
-	ProcessPaymentRequestBatch(ctx context.Context) error
 	DownloadInvoicePdf(ctx context.Context, orderID int64) (string, error)
 }
 
@@ -94,10 +93,6 @@ func (u *paymentUsecase) ProcessPaymentWebhook(ctx context.Context, payload mode
 // ProcessPaymentRequest handles order.created: save event to payment_requests (no invoice creation yet).
 func (u *paymentUsecase) ProcessPaymentRequest(ctx context.Context, event models.OrderCreatedEvent) error {
 	return u.paymentService.SavePaymentRequestFromEvent(ctx, event)
-}
-
-func (u *paymentUsecase) ProcessPaymentRequestBatch(ctx context.Context) error {
-	return u.paymentService.ProcessBatch(ctx)
 }
 
 func (u *paymentUsecase) DownloadInvoicePdf(ctx context.Context, orderID int64) (string, error) {

@@ -5,14 +5,43 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database" validate:"required"`
 	Redis    RedisConfig    `yaml:"redis" validate:"required"`
 	Kafka    KafkaConfig    `yaml:"kafka" validate:"required"`
-	Xendit   XenditConfig   `yaml:"xendit" validate:"required"`
+	Xendit   XenditConfig   `yaml:"xendit"`
 	Mongo    MongoConfig    `yaml:"mongo"`
 	Toggle   ToggleConfig   `yaml:"toggle"`
 	GRPC     GRPCConfig     `yaml:"grpc"`
+	Vault    VaultConfig    `yaml:"vault"`
+}
+
+type VaultConfig struct {
+	Host  string `yaml:"host" validate:"required"`
+	Token string `yaml:"token" validate:"required"`
+	Path  string `yaml:"path" validate:"required"`
+}
+
+type SecretVaultConfig struct {
+	DatabaseSecret DatabaseSecretConfig `json:"database"`
+	RedisSecret    RedisSecretConfig    `json:"redis"`
+	JWTSecret      string               `json:"jwt_secret"`
+	GRPCCredential string               `json:"grpcCredentials"`
+	XenditSecret   XenditSecretConfig   `json:"xendit"`
+}
+
+type DatabaseSecretConfig struct {
+	Password string `json:"password"`
+}
+
+type RedisSecretConfig struct {
+	Password string `json:"password"`
+}
+
+type XenditSecretConfig struct {
+	SecretAPIKey string `json:"secret_api_key"`
+	WebhookToken string `json:"webhook_token"`
 }
 
 type GRPCConfig struct {
 	UserServiceAddr string `yaml:"user_service_addr" mapstructure:"user_service_addr"`
+	Credentials     string `yaml:"credentials" mapstructure:"credentials"`
 }
 
 // ToggleConfig feature flags (실시간 인보이스 vs 배치)

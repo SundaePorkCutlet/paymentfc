@@ -19,7 +19,7 @@ type SchedulerService struct {
 	Publisher      repository.PaymentEventPublisher
 	PaymentService PaymentService
 	AuditLog       repository.AuditLogRepository
-	UserClient     *usergrpc.UserClient
+	UserClient     usergrpc.UserClientInterface
 }
 
 func (s *SchedulerService) StartSweepingExpiredPendingPayments() {

@@ -19,7 +19,6 @@ type PaymentService interface {
 	SaveFailedPublishEvent(ctx context.Context, param *models.FailedEvent) error
 	GetPaymentByOrderID(ctx context.Context, orderID int64) (*models.Payment, error)
 	SavePaymentRequestFromEvent(ctx context.Context, event models.OrderCreatedEvent) error
-	ProcessBatch(ctx context.Context) error
 }
 
 type paymentService struct {
@@ -179,46 +178,6 @@ func (s *paymentService) SavePaymentRequestFromEvent(ctx context.Context, event 
 	})
 
 	log.Logger.Info().Int64("order_id", event.OrderID).Msg("Saved payment_request from order.created")
-	return nil
-}
-
-func (s *paymentService) ProcessBatch(ctx context.Context) error {
-	list, err := s.database.GetPendingPaymentRequests(ctx)
-	if err != nil {
-		return err
-	}
-	for _, pr := range list {
-		invoiceResp, err := s.xenditService.CreateInvoiceFromPaymentRequest(ctx, &pr)
-		if err != nil {
-			s.auditLog.SaveAuditLog(ctx, &models.PaymentAuditLog{
-				OrderID: pr.OrderID,
-				UserID:  pr.UserID,
-				Event:   "INVOICE_CREATION_FAILED",
-				Actor:   "batch_processor",
-				Metadata: map[string]any{
-					"error": err.Error(),
-				},
-			})
-			if updateErr := s.database.UpdateFailedPaymentRequest(ctx, pr.ID, err.Error()); updateErr != nil {
-				log.Logger.Error().Err(updateErr).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as failed")
-			}
-			continue
-		}
-		s.auditLog.SaveAuditLog(ctx, &models.PaymentAuditLog{
-			OrderID:    pr.OrderID,
-			UserID:     pr.UserID,
-			ExternalID: fmt.Sprintf("order-%d", pr.OrderID),
-			Event:      "INVOICE_CREATED",
-			Actor:      "batch_processor",
-			Metadata: map[string]any{
-				"amount":     pr.Amount,
-				"invoice_id": invoiceResp.ID,
-			},
-		})
-		if err := s.database.UpdateSuccessPaymentRequest(ctx, pr.ID); err != nil {
-			log.Logger.Error().Err(err).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as success")
-		}
-	}
 	return nil
 }
 

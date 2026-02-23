@@ -30,6 +30,9 @@ func main() {
 
 	log.Logger.Info().Bool("disable_create_invoice_directly", cfg.Toggle.DisableCreateInvoiceDirectly).Msg("Toggle config loaded")
 
+	// Vault에서 secrets 로드
+	config.LoadVaultSecrets(&cfg)
+
 	db := resource.InitDB(cfg.Database)
 	mongoDB := resource.InitMongo(cfg.Mongo)
 
