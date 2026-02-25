@@ -10,6 +10,13 @@ type Config struct {
 	Toggle   ToggleConfig   `yaml:"toggle"`
 	GRPC     GRPCConfig     `yaml:"grpc"`
 	Vault    VaultConfig    `yaml:"vault"`
+	Tracing  TracingConfig  `yaml:"tracing"`
+}
+
+type TracingConfig struct {
+	Endpoint    string `yaml:"endpoint" mapstructure:"endpoint"`
+	ServiceName string `yaml:"service_name" mapstructure:"service_name"`
+	Enabled     bool   `yaml:"enabled" mapstructure:"enabled"`
 }
 
 type VaultConfig struct {

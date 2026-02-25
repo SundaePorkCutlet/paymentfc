@@ -14,6 +14,7 @@ import (
 	"paymentfc/log"
 	"paymentfc/models"
 	"paymentfc/routes"
+	"paymentfc/tracing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -32,6 +33,14 @@ func main() {
 
 	// Vault에서 secrets 로드
 	config.LoadVaultSecrets(&cfg)
+
+	// Tracing 초기화
+	shutdownTracer, err := tracing.InitTracer(cfg.Tracing)
+	if err != nil {
+		log.Logger.Warn().Err(err).Msg("Failed to initialize tracing - continuing without tracing")
+	} else {
+		defer shutdownTracer(context.Background())
+	}
 
 	db := resource.InitDB(cfg.Database)
 	mongoDB := resource.InitMongo(cfg.Mongo)
@@ -101,6 +110,11 @@ func main() {
 
 	port := cfg.App.Port
 	router := gin.Default()
+
+	// 트레이싱 미들웨어 추가
+	if cfg.Tracing.Enabled {
+		router.Use(tracing.GinMiddleware(cfg.Tracing.ServiceName))
+	}
 
 	// 라우트 설정
 	routes.SetupRoutes(router, paymentHandler)

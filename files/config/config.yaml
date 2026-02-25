@@ -43,3 +43,8 @@ vault:
   host: http://vault:8200
   token: fcproject
   path: paymentfc
+
+tracing:
+  endpoint: http://jaeger:4318
+  service_name: paymentfc
+  enabled: true
