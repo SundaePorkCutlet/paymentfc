@@ -93,6 +93,20 @@ func (mr *MockPaymentServiceMockRecorder) ProcessPaymentSuccess(ctx, orderID int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPaymentSuccess", reflect.TypeOf((*MockPaymentService)(nil).ProcessPaymentSuccess), ctx, orderID)
 }
 
+// ProcessPaymentFailed mocks base method.
+func (m *MockPaymentService) ProcessPaymentFailed(ctx context.Context, orderID int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProcessPaymentFailed", ctx, orderID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ProcessPaymentFailed indicates an expected call of ProcessPaymentFailed.
+func (mr *MockPaymentServiceMockRecorder) ProcessPaymentFailed(ctx, orderID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPaymentFailed", reflect.TypeOf((*MockPaymentService)(nil).ProcessPaymentFailed), ctx, orderID)
+}
+
 // SaveFailedPublishEvent mocks base method.
 func (m *MockPaymentService) SaveFailedPublishEvent(ctx context.Context, param *models.FailedEvent) error {
 	m.ctrl.T.Helper()
@@ -133,4 +147,19 @@ func (m *MockPaymentService) SavePaymentRequestFromEvent(ctx context.Context, ev
 func (mr *MockPaymentServiceMockRecorder) SavePaymentRequestFromEvent(ctx, event interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SavePaymentRequestFromEvent", reflect.TypeOf((*MockPaymentService)(nil).SavePaymentRequestFromEvent), ctx, event)
+}
+
+// GetFailedPaymentList mocks base method.
+func (m *MockPaymentService) GetFailedPaymentList(ctx context.Context) ([]models.PaymentRequest, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFailedPaymentList", ctx)
+	ret0, _ := ret[0].([]models.PaymentRequest)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFailedPaymentList indicates an expected call of GetFailedPaymentList.
+func (mr *MockPaymentServiceMockRecorder) GetFailedPaymentList(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFailedPaymentList", reflect.TypeOf((*MockPaymentService)(nil).GetFailedPaymentList), ctx)
 }

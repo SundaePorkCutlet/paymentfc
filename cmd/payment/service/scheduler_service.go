@@ -33,6 +33,24 @@ func (s *SchedulerService) StartSweepingExpiredPendingPayments() {
 				continue
 			}
 			for _, payment := range pendingExpiredPayments {
+
+				paymentInfo, err := s.PaymentService.GetPaymentByOrderID(ctx, payment.OrderID)
+				if err != nil {
+					log.Logger.Error().Err(err).Int64("order_id", payment.OrderID).Msg("Failed to get payment by order_id")
+					continue
+				}
+				if paymentInfo.Status != constant.PaymentStatusPending {
+					continue
+				}
+
+				err = retryPublishPayment(constant.MaxRetryPublish, func() error {
+					return s.Publisher.PublishPaymentStatus(ctx, payment.OrderID, constant.PaymentStatusExpired, "payment.expired")
+				})
+				if err != nil {
+					log.Logger.Error().Err(err).Int64("order_id", payment.OrderID).Msg("Failed to publish payment expired")
+					continue
+				}
+
 				if markErr := s.Database.MarkExpired(ctx, payment.ID); markErr != nil {
 					log.Logger.Error().Err(markErr).Int64("payment_id", payment.ID).Msg("Failed to mark payment as expired")
 				} else {
@@ -136,23 +154,23 @@ func (s *SchedulerService) StartProcessPendingPaymentRequests() {
 			for _, pr := range paymentRequests {
 				log.Logger.Debug().Int64("order_id", pr.OrderID).Msg("Processing payment request")
 
-			payerEmail := pr.UserEmail
-			if payerEmail == "" {
-				if s.UserClient == nil {
-					log.Logger.Error().Int64("order_id", pr.OrderID).Msg("User gRPC client is not initialized, skipping")
-					continue
-				}
-				userInfo, err := s.UserClient.GetUserInfoByUserId(ctx, pr.UserID)
-				if err != nil {
-					log.Logger.Error().Err(err).Int64("user_id", pr.UserID).Msg("Failed to get user info via gRPC")
-					if updateErr := s.Database.UpdateFailedPaymentRequest(ctx, pr.ID, "failed to get user email"); updateErr != nil {
-						log.Logger.Error().Err(updateErr).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as failed")
+				payerEmail := pr.UserEmail
+				if payerEmail == "" {
+					if s.UserClient == nil {
+						log.Logger.Error().Int64("order_id", pr.OrderID).Msg("User gRPC client is not initialized, skipping")
+						continue
 					}
-					continue
+					userInfo, err := s.UserClient.GetUserInfoByUserId(ctx, pr.UserID)
+					if err != nil {
+						log.Logger.Error().Err(err).Int64("user_id", pr.UserID).Msg("Failed to get user info via gRPC")
+						if updateErr := s.Database.UpdateFailedPaymentRequest(ctx, pr.ID, "failed to get user email"); updateErr != nil {
+							log.Logger.Error().Err(updateErr).Int64("payment_request_id", pr.ID).Msg("Failed to update payment_request as failed")
+						}
+						continue
+					}
+					payerEmail = userInfo.Email
+					log.Logger.Info().Int64("user_id", pr.UserID).Str("email", payerEmail).Msg("Got user email via gRPC")
 				}
-				payerEmail = userInfo.Email
-				log.Logger.Info().Int64("user_id", pr.UserID).Str("email", payerEmail).Msg("Got user email via gRPC")
-			}
 				xenditReq := models.XenditInvoiceRequest{
 					ExternalID:  fmt.Sprintf("order-%d", pr.OrderID),
 					Amount:      pr.Amount,

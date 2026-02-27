@@ -96,3 +96,13 @@ func (h *PaymentHandler) HandleDownloadInvoicePdf(c *gin.Context) {
 
 	c.FileAttachment(filePath, filePath)
 }
+
+func (h *PaymentHandler) HandleFailedPayments(c *gin.Context) {
+	paymentList, err := h.PaymentUsecase.GetFailedPaymentList(c.Request.Context())
+	if err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to get failed payment list")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, paymentList)
+}

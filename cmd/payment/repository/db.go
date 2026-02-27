@@ -15,6 +15,7 @@ type PaymentDatabase interface {
 	SavePaymentAnomaly(ctx context.Context, param *models.PaymentAnomaly) error
 	SaveFailedPublishEvent(ctx context.Context, param *models.FailedEvent) error
 	MarkPaid(orderID int64) error
+	MarkFailed(orderID int64) error
 	IsAlreadyPaid(ctx context.Context, orderID int64) (bool, error)
 	GetPaymentByOrderID(ctx context.Context, orderID int64) (*models.Payment, error)
 	GetPendingInvoices(ctx context.Context) ([]models.Payment, error)
@@ -26,6 +27,7 @@ type PaymentDatabase interface {
 	UpdatePendingPaymentRequest(ctx context.Context, paymentRequestID int64) error
 	GetExpiredPendingPayments(ctx context.Context) ([]models.Payment, error)
 	MarkExpired(ctx context.Context, paymentID int64) error
+	GetFailedPaymentList(ctx context.Context) ([]models.PaymentRequest, error)
 }
 
 type paymentDatabase struct {
@@ -70,6 +72,19 @@ func (p *paymentDatabase) MarkPaid(orderID int64) error {
 	err := p.DB.Table("payments").Where("order_id = ?", orderID).Update("status", constant.PaymentStatusPaid).Error
 	if err != nil {
 		log.Logger.Error().Err(err).Msgf("Failed to mark payment as paid for order_id: %d", orderID)
+		return err
+	}
+	return nil
+}
+
+func (p *paymentDatabase) MarkFailed(orderID int64) error {
+	err := p.DB.Table("payments").Where("order_id = ?", orderID).Updates(
+		map[string]interface{}{
+			"status":      constant.PaymentStatusFailed,
+			"update_time": time.Now(),
+		}).Error
+	if err != nil {
+		log.Logger.Error().Err(err).Int64("order_id", orderID).Msg("Failed to mark payment as failed")
 		return err
 	}
 	return nil
@@ -191,4 +206,14 @@ func (p *paymentDatabase) MarkExpired(ctx context.Context, paymentID int64) erro
 		return err
 	}
 	return nil
+}
+
+func (p *paymentDatabase) GetFailedPaymentList(ctx context.Context) ([]models.PaymentRequest, error) {
+	var result []models.PaymentRequest
+	err := p.DB.Table("payment_requests").WithContext(ctx).Where("status = ? and retry_count <= ?", constant.PaymentStatusFailed, 3).
+		Limit(5).Order("create_time ASC").Find(&result).Error
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

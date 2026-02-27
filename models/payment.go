@@ -26,3 +26,8 @@ type PaymentRequest struct {
 	CreateTime time.Time `json:"create_time" gorm:"type:timestamp;autoCreateTime"`
 	UpdateTime time.Time `json:"update_time" gorm:"type:timestamp;autoUpdateTime"`
 }
+
+type FailedPaymentList struct {
+	TotalFailedPayments int64            `json:"total_failed_payments"`
+	PaymentList         []PaymentRequest `json:"payment_list"`
+}

@@ -9,7 +9,7 @@ import (
 )
 
 type PaymentEventPublisher interface {
-	PublishPaymentSuccess(orderID int64) error
+	PublishPaymentStatus(ctx context.Context, orderID int64, status string, topic string) error
 }
 
 type kafkaPublisher struct {
@@ -26,14 +26,15 @@ func NewKafkaPublisher(writer *kafka.Writer) PaymentEventPublisher {
 	}
 }
 
-// PublishPaymentSuccess publish payment success event to kafka.
-func (k *kafkaPublisher) PublishPaymentSuccess(orderID int64) error {
+// PublishPaymentStatus publishes payment status event to kafka (e.g. "paid", "failed").
+func (k *kafkaPublisher) PublishPaymentStatus(ctx context.Context, orderID int64, status string, topic string) error {
 	payload := map[string]interface{}{
 		"order_id": orderID,
-		"status":   "paid",
+		"status":   status,
+		"topic":    topic,
 	}
 	data, _ := json.Marshal(payload)
-	return k.writer.WriteMessages(context.Background(), kafka.Message{
+	return k.writer.WriteMessages(ctx, kafka.Message{
 		Key:   []byte(fmt.Sprintf("order-%d", orderID)),
 		Value: data,
 	})

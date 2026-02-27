@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"paymentfc/constant"
 	"paymentfc/mocks"
 	"paymentfc/models"
 	"testing"
@@ -34,7 +35,7 @@ func TestPaymentService_ProcessPaymentSuccess(t *testing.T) {
 	t.Run("success flow", func(t *testing.T) {
 		mockDB.EXPECT().IsAlreadyPaid(ctx, orderID).Return(false, nil)
 		mockAuditLog.EXPECT().SaveAuditLog(ctx, gomock.Any()).Return(nil)
-		mockPublisher.EXPECT().PublishPaymentSuccess(orderID).Return(nil)
+		mockPublisher.EXPECT().PublishPaymentStatus(ctx, orderID, constant.PaymentStatusPaid, "payment.success").Return(nil)
 		mockDB.EXPECT().MarkPaid(orderID).Return(nil)
 		mockAuditLog.EXPECT().SaveAuditLog(ctx, gomock.Any()).Return(nil)
 

@@ -64,6 +64,21 @@ func (mr *MockPaymentDatabaseMockRecorder) GetFailedPaymentRequests(ctx interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFailedPaymentRequests", reflect.TypeOf((*MockPaymentDatabase)(nil).GetFailedPaymentRequests), ctx)
 }
 
+// GetFailedPaymentList mocks base method.
+func (m *MockPaymentDatabase) GetFailedPaymentList(ctx context.Context) ([]models.PaymentRequest, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFailedPaymentList", ctx)
+	ret0, _ := ret[0].([]models.PaymentRequest)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetFailedPaymentList indicates an expected call of GetFailedPaymentList.
+func (mr *MockPaymentDatabaseMockRecorder) GetFailedPaymentList(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFailedPaymentList", reflect.TypeOf((*MockPaymentDatabase)(nil).GetFailedPaymentList), ctx)
+}
+
 // GetPaymentByOrderID mocks base method.
 func (m *MockPaymentDatabase) GetPaymentByOrderID(ctx context.Context, orderID int64) (*models.Payment, error) {
 	m.ctrl.T.Helper()
@@ -150,6 +165,20 @@ func (m *MockPaymentDatabase) MarkPaid(orderID int64) error {
 func (mr *MockPaymentDatabaseMockRecorder) MarkPaid(orderID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkPaid", reflect.TypeOf((*MockPaymentDatabase)(nil).MarkPaid), orderID)
+}
+
+// MarkFailed mocks base method.
+func (m *MockPaymentDatabase) MarkFailed(orderID int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkFailed", orderID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkFailed indicates an expected call of MarkFailed.
+func (mr *MockPaymentDatabaseMockRecorder) MarkFailed(orderID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkFailed", reflect.TypeOf((*MockPaymentDatabase)(nil).MarkFailed), orderID)
 }
 
 // SaveFailedPublishEvent mocks base method.
@@ -326,18 +355,18 @@ func (m *MockPaymentEventPublisher) EXPECT() *MockPaymentEventPublisherMockRecor
 	return m.recorder
 }
 
-// PublishPaymentSuccess mocks base method.
-func (m *MockPaymentEventPublisher) PublishPaymentSuccess(orderID int64) error {
+// PublishPaymentStatus mocks base method.
+func (m *MockPaymentEventPublisher) PublishPaymentStatus(ctx context.Context, orderID int64, status string, topic string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PublishPaymentSuccess", orderID)
+	ret := m.ctrl.Call(m, "PublishPaymentStatus", ctx, orderID, status, topic)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// PublishPaymentSuccess indicates an expected call of PublishPaymentSuccess.
-func (mr *MockPaymentEventPublisherMockRecorder) PublishPaymentSuccess(orderID interface{}) *gomock.Call {
+// PublishPaymentStatus indicates an expected call of PublishPaymentStatus.
+func (mr *MockPaymentEventPublisherMockRecorder) PublishPaymentStatus(ctx, orderID, status, topic interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishPaymentSuccess", reflect.TypeOf((*MockPaymentEventPublisher)(nil).PublishPaymentSuccess), orderID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishPaymentStatus", reflect.TypeOf((*MockPaymentEventPublisher)(nil).PublishPaymentStatus), ctx, orderID, status, topic)
 }
 
 // MockAuditLogRepository is a mock of AuditLogRepository interface.

@@ -28,5 +28,6 @@ func SetupRoutes(router *gin.Engine, paymentHandler *handler.PaymentHandler) {
 	{
 		private.POST("/v1/payment/invoice", paymentHandler.CreateInvoice)
 		private.GET("/v1/invoice/:order_id/pdf", paymentHandler.HandleDownloadInvoicePdf)
+		private.GET("/v1/failed_payments", paymentHandler.HandleFailedPayments)
 	}
 }

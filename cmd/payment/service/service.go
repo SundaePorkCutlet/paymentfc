@@ -13,12 +13,14 @@ import (
 
 type PaymentService interface {
 	ProcessPaymentSuccess(ctx context.Context, orderID int64) error
+	ProcessPaymentFailed(ctx context.Context, orderID int64) error
 	IsAlreadyPaid(ctx context.Context, orderID int64) (bool, error)
 	GetAmountByOrderID(ctx context.Context, orderID int64) (float64, error)
 	SavePaymentAnomaly(ctx context.Context, param *models.PaymentAnomaly) error
 	SaveFailedPublishEvent(ctx context.Context, param *models.FailedEvent) error
 	GetPaymentByOrderID(ctx context.Context, orderID int64) (*models.Payment, error)
 	SavePaymentRequestFromEvent(ctx context.Context, event models.OrderCreatedEvent) error
+	GetFailedPaymentList(ctx context.Context) ([]models.PaymentRequest, error)
 }
 
 type paymentService struct {
@@ -48,7 +50,7 @@ func (s *paymentService) ProcessPaymentSuccess(ctx context.Context, orderID int6
 	}
 
 	// publish event kafka
-	err = s.RetryPublishPayment(constant.MaxRetryPublish, func() error {
+	err = retryPublishPayment(constant.MaxRetryPublish, func() error {
 		if err := s.auditLog.SaveAuditLog(ctx, &models.PaymentAuditLog{
 			OrderID: orderID,
 			Event:   "PUBLISH_PAYMENT_SUCCESS",
@@ -56,10 +58,10 @@ func (s *paymentService) ProcessPaymentSuccess(ctx context.Context, orderID int6
 		}); err != nil {
 			log.Logger.Error().Err(err).Int64("order_id", orderID).Msg("Failed to save audit log")
 		}
-		return s.publisher.PublishPaymentSuccess(orderID)
+		return s.publisher.PublishPaymentStatus(ctx, orderID, constant.PaymentStatusPaid, "payment.success")
 	})
 	if err != nil {
-		log.Logger.Error().Err(err).Int64("order_id", orderID).Msg("s.publisher.PublishPaymentSuccess() got error")
+		log.Logger.Error().Err(err).Int64("order_id", orderID).Msg("s.publisher.PublishPaymentStatus() got error")
 		failed := &models.FailedEvent{
 			OrderID:    orderID,
 			ExternalID: fmt.Sprintf("order-%d", orderID),
@@ -71,7 +73,7 @@ func (s *paymentService) ProcessPaymentSuccess(ctx context.Context, orderID int6
 		if saveErr := s.database.SaveFailedPublishEvent(ctx, failed); saveErr != nil {
 			log.Logger.Error().Err(saveErr).Int64("order_id", orderID).Msg("Failed to save failed_event")
 		}
-		return err
+		return s.publisher.PublishPaymentStatus(ctx, orderID, constant.PaymentStatusFailed, "payment.failed")
 	}
 
 	err = s.database.MarkPaid(orderID)
@@ -88,6 +90,35 @@ func (s *paymentService) ProcessPaymentSuccess(ctx context.Context, orderID int6
 		}
 	}
 
+	return nil
+}
+
+func (s *paymentService) ProcessPaymentFailed(ctx context.Context, orderID int64) error {
+	paymentInfo, err := s.database.GetPaymentByOrderID(ctx, orderID)
+	if err != nil {
+		return err
+	}
+	if paymentInfo.Status == constant.PaymentStatusFailed {
+		return nil
+	}
+
+	err = retryPublishPayment(constant.MaxRetryPublish, func() error {
+		if err := s.auditLog.SaveAuditLog(ctx, &models.PaymentAuditLog{
+			OrderID: orderID,
+			Event:   "PUBLISH_PAYMENT_FAILED",
+			Actor:   "payment",
+		}); err != nil {
+			log.Logger.Error().Err(err).Int64("order_id", orderID).Msg("Failed to save audit log")
+		}
+		return s.publisher.PublishPaymentStatus(ctx, orderID, constant.PaymentStatusFailed, "payment.failed")
+	})
+	if err != nil {
+		return err
+	}
+	err = s.database.MarkFailed(orderID)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -138,7 +169,7 @@ func (s *paymentService) SaveFailedPublishEvent(ctx context.Context, param *mode
 }
 
 // RetryPublishPayment runs fn up to max times with exponential backoff (2^i seconds); returns nil on first success or the last error.
-func (s *paymentService) RetryPublishPayment(max int, fn func() error) error {
+func retryPublishPayment(max int, fn func() error) error {
 	var err error
 	for i := 0; i < max; i++ {
 		err = fn()
@@ -183,4 +214,8 @@ func (s *paymentService) SavePaymentRequestFromEvent(ctx context.Context, event 
 
 func (s *paymentService) GetPaymentByOrderID(ctx context.Context, orderID int64) (*models.Payment, error) {
 	return s.database.GetPaymentByOrderID(ctx, orderID)
+}
+
+func (s *paymentService) GetFailedPaymentList(ctx context.Context) ([]models.PaymentRequest, error) {
+	return s.database.GetFailedPaymentList(ctx)
 }

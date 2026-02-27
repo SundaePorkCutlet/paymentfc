@@ -18,6 +18,7 @@ type PaymentUsecase interface {
 	ProcessPaymentWebhook(ctx context.Context, payload models.XenditWebhookPayload) error
 	ProcessPaymentRequest(ctx context.Context, event models.OrderCreatedEvent) error
 	DownloadInvoicePdf(ctx context.Context, orderID int64) (string, error)
+	GetFailedPaymentList(ctx context.Context) (models.FailedPaymentList, error)
 }
 
 type paymentUsecase struct {
@@ -81,7 +82,12 @@ func (u *paymentUsecase) ProcessPaymentWebhook(ctx context.Context, payload mode
 		}
 		return u.paymentService.ProcessPaymentSuccess(ctx, orderID)
 	case constant.PaymentStatusFailed:
-		// TODO: 결제 실패 처리
+		orderID, err := extractOrderID(payload.ExternalID)
+		if err != nil {
+			log.Logger.Error().Err(err).Msgf("Failed to extract order ID from external_id: %s", payload.ExternalID)
+			return err
+		}
+		return u.paymentService.ProcessPaymentFailed(ctx, orderID)
 	case constant.PaymentStatusPending:
 		// TODO: 결제 대기 처리
 	default:
@@ -106,4 +112,15 @@ func (u *paymentUsecase) DownloadInvoicePdf(ctx context.Context, orderID int64) 
 		return "", err
 	}
 	return filePath, nil
+}
+
+func (u *paymentUsecase) GetFailedPaymentList(ctx context.Context) (models.FailedPaymentList, error) {
+	paymentList, err := u.paymentService.GetFailedPaymentList(ctx)
+	if err != nil {
+		return models.FailedPaymentList{}, err
+	}
+	return models.FailedPaymentList{
+		TotalFailedPayments: int64(len(paymentList)),
+		PaymentList:         paymentList,
+	}, nil
 }
