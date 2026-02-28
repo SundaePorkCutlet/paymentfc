@@ -94,7 +94,7 @@ func (h *PaymentHandler) HandleDownloadInvoicePdf(c *gin.Context) {
 		return
 	}
 
-	c.FileAttachment(filePath, filePath)
+	c.FileAttachment(filePath, "invoice_"+orderIdStr+".pdf")
 }
 
 func (h *PaymentHandler) HandleFailedPayments(c *gin.Context) {

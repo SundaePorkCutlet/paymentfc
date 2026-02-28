@@ -19,8 +19,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	kafkago "github.com/segmentio/kafka-go"
+
+	_ "paymentfc/docs"
 )
 
+// @title           PAYMENTFC API
+// @version         1.0
+// @description     Payment, Xendit invoice, webhook, and audit for Go Commerce.
+// @host            localhost:28083
+// @BasePath        /
+// @schemes         http
 func main() {
 	// .env 파일이 있으면 로드 (없어도 에러 안 남)
 	godotenv.Load()

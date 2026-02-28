@@ -6,13 +6,13 @@ import (
 	"paymentfc/middleware"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func SetupRoutes(router *gin.Engine, paymentHandler *handler.PaymentHandler) {
-	// 미들웨어 설정
 	router.Use(middleware.RequestLogger())
-
-	// public API
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/ping", paymentHandler.Ping())
 	router.POST("/v1/payment/webhook", paymentHandler.HandleXenditWebhook)
 	router.GET("/health", func(c *gin.Context) {

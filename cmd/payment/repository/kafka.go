@@ -33,7 +33,10 @@ func (k *kafkaPublisher) PublishPaymentStatus(ctx context.Context, orderID int64
 		"status":   status,
 		"topic":    topic,
 	}
-	data, _ := json.Marshal(payload)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
 	return k.writer.WriteMessages(ctx, kafka.Message{
 		Key:   []byte(fmt.Sprintf("order-%d", orderID)),
 		Value: data,
