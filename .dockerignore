@@ -1,0 +1,15 @@
+# Docker 빌드 시 불필요한 파일 제외 → 컨텍스트 축소로 빌드 속도 개선
+vendor/
+
+.git
+.gitignore
+.idea
+.vscode
+.cursor
+*.swp
+.DS_Store
+*_test.go
+*.md
+*.log
+tmp
+temp
