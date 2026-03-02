@@ -1,0 +1,11 @@
+# PAYMENTFC 메트릭 스크랩 설정 (중앙 Prometheus에서 참조/병합용)
+# docker-compose 내부: paymentfc:28083
+scrape_configs:
+  - job_name: paymentfc
+    static_configs:
+      - targets:
+          - paymentfc:28083
+        labels:
+          service: paymentfc
+    metrics_path: /metrics
+    scrape_interval: 15s
