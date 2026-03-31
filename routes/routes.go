@@ -1,11 +1,14 @@
 package routes
 
 import (
+	"net/http"
 	"paymentfc/cmd/payment/handler"
+	"paymentfc/cmd/payment/resource"
 	"paymentfc/config"
 	"paymentfc/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -13,6 +16,7 @@ import (
 func SetupRoutes(router *gin.Engine, paymentHandler *handler.PaymentHandler) {
 	router.Use(middleware.RequestLogger())
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	router.GET("/ping", paymentHandler.Ping())
 	router.POST("/v1/payment/webhook", paymentHandler.HandleXenditWebhook)
 	router.GET("/health", func(c *gin.Context) {
@@ -22,7 +26,14 @@ func SetupRoutes(router *gin.Engine, paymentHandler *handler.PaymentHandler) {
 		})
 	})
 
-	// private API (인증 필요)
+	router.GET("/debug/queries", func(c *gin.Context) {
+		if resource.DBMonitor == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "monitor not initialized"})
+			return
+		}
+		c.JSON(http.StatusOK, resource.DBMonitor.GetDebugInfo())
+	})
+
 	private := router.Group("/api")
 	private.Use(middleware.AuthMiddleware(config.GetJwtSecret()))
 	{
