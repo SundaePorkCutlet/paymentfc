@@ -21,6 +21,9 @@ type PaymentService interface {
 	GetPaymentByOrderID(ctx context.Context, orderID int64) (*models.Payment, error)
 	SavePaymentRequestFromEvent(ctx context.Context, event models.OrderCreatedEvent) error
 	GetFailedPaymentList(ctx context.Context) ([]models.PaymentRequest, error)
+	ListAuditLogs(ctx context.Context, filter models.AuditLogFilter) (models.AuditLogPage, error)
+	GetAuditDailyReport(ctx context.Context, from, to time.Time) ([]models.AuditDailyReportItem, error)
+	WatchAuditInsertStream(ctx context.Context, out chan<- models.PaymentAuditLog) error
 }
 
 type paymentService struct {
@@ -218,4 +221,16 @@ func (s *paymentService) GetPaymentByOrderID(ctx context.Context, orderID int64)
 
 func (s *paymentService) GetFailedPaymentList(ctx context.Context) ([]models.PaymentRequest, error) {
 	return s.database.GetFailedPaymentList(ctx)
+}
+
+func (s *paymentService) ListAuditLogs(ctx context.Context, filter models.AuditLogFilter) (models.AuditLogPage, error) {
+	return s.auditLog.ListAuditLogs(ctx, filter)
+}
+
+func (s *paymentService) GetAuditDailyReport(ctx context.Context, from, to time.Time) ([]models.AuditDailyReportItem, error) {
+	return s.auditLog.GetDailyReport(ctx, from, to)
+}
+
+func (s *paymentService) WatchAuditInsertStream(ctx context.Context, out chan<- models.PaymentAuditLog) error {
+	return s.auditLog.WatchInsertStream(ctx, out)
 }

@@ -7,6 +7,7 @@ import (
 	context "context"
 	models "paymentfc/models"
 	reflect "reflect"
+	time "time"
 
 	gomock "go.uber.org/mock/gomock"
 )
@@ -162,4 +163,48 @@ func (m *MockPaymentService) GetFailedPaymentList(ctx context.Context) ([]models
 func (mr *MockPaymentServiceMockRecorder) GetFailedPaymentList(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFailedPaymentList", reflect.TypeOf((*MockPaymentService)(nil).GetFailedPaymentList), ctx)
+}
+
+// ListAuditLogs mocks base method.
+func (m *MockPaymentService) ListAuditLogs(ctx context.Context, filter models.AuditLogFilter) (models.AuditLogPage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAuditLogs", ctx, filter)
+	ret0, _ := ret[0].(models.AuditLogPage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAuditLogs indicates an expected call of ListAuditLogs.
+func (mr *MockPaymentServiceMockRecorder) ListAuditLogs(ctx, filter interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAuditLogs", reflect.TypeOf((*MockPaymentService)(nil).ListAuditLogs), ctx, filter)
+}
+
+// GetAuditDailyReport mocks base method.
+func (m *MockPaymentService) GetAuditDailyReport(ctx context.Context, from, to time.Time) ([]models.AuditDailyReportItem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAuditDailyReport", ctx, from, to)
+	ret0, _ := ret[0].([]models.AuditDailyReportItem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAuditDailyReport indicates an expected call of GetAuditDailyReport.
+func (mr *MockPaymentServiceMockRecorder) GetAuditDailyReport(ctx, from, to interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuditDailyReport", reflect.TypeOf((*MockPaymentService)(nil).GetAuditDailyReport), ctx, from, to)
+}
+
+// WatchAuditInsertStream mocks base method.
+func (m *MockPaymentService) WatchAuditInsertStream(ctx context.Context, out chan<- models.PaymentAuditLog) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WatchAuditInsertStream", ctx, out)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WatchAuditInsertStream indicates an expected call of WatchAuditInsertStream.
+func (mr *MockPaymentServiceMockRecorder) WatchAuditInsertStream(ctx, out interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WatchAuditInsertStream", reflect.TypeOf((*MockPaymentService)(nil).WatchAuditInsertStream), ctx, out)
 }

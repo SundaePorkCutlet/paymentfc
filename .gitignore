@@ -1,2 +1,5 @@
 .env
 vendor/
+/main
+/paymentfc
+gobuild.log

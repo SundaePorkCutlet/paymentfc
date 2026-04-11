@@ -19,6 +19,9 @@ type PaymentUsecase interface {
 	ProcessPaymentRequest(ctx context.Context, event models.OrderCreatedEvent) error
 	DownloadInvoicePdf(ctx context.Context, orderID int64) (string, error)
 	GetFailedPaymentList(ctx context.Context) (models.FailedPaymentList, error)
+	ListAuditLogs(ctx context.Context, filter models.AuditLogFilter) (models.AuditLogPage, error)
+	GetAuditDailyReport(ctx context.Context, from, to time.Time) ([]models.AuditDailyReportItem, error)
+	WatchAuditInsertStream(ctx context.Context, out chan<- models.PaymentAuditLog) error
 }
 
 type paymentUsecase struct {
@@ -123,4 +126,16 @@ func (u *paymentUsecase) GetFailedPaymentList(ctx context.Context) (models.Faile
 		TotalFailedPayments: int64(len(paymentList)),
 		PaymentList:         paymentList,
 	}, nil
+}
+
+func (u *paymentUsecase) ListAuditLogs(ctx context.Context, filter models.AuditLogFilter) (models.AuditLogPage, error) {
+	return u.paymentService.ListAuditLogs(ctx, filter)
+}
+
+func (u *paymentUsecase) GetAuditDailyReport(ctx context.Context, from, to time.Time) ([]models.AuditDailyReportItem, error) {
+	return u.paymentService.GetAuditDailyReport(ctx, from, to)
+}
+
+func (u *paymentUsecase) WatchAuditInsertStream(ctx context.Context, out chan<- models.PaymentAuditLog) error {
+	return u.paymentService.WatchAuditInsertStream(ctx, out)
 }
