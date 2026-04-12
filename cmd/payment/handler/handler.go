@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"paymentfc/cmd/payment/usecase"
+	bizmetrics "paymentfc/infrastructure/metrics"
 	"paymentfc/log"
 	"paymentfc/models"
 	"strconv"
@@ -35,6 +36,7 @@ func (h *PaymentHandler) Ping() gin.HandlerFunc {
 
 func (h *PaymentHandler) HandleXenditWebhook(c *gin.Context) {
 	if c.GetHeader("x-callback-token") != h.XenditWebhookToken {
+		bizmetrics.XenditWebhookProcessed.WithLabelValues("invalid_token").Inc()
 		log.Logger.Warn().Msg("Xendit webhook: invalid or missing callback token")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid callback token"})
 		return
@@ -42,6 +44,7 @@ func (h *PaymentHandler) HandleXenditWebhook(c *gin.Context) {
 
 	var payload models.XenditWebhookPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
+		bizmetrics.XenditWebhookProcessed.WithLabelValues("bind_error").Inc()
 		log.Logger.Error().Err(err).Msg("Failed to bind webhook payload")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -49,11 +52,13 @@ func (h *PaymentHandler) HandleXenditWebhook(c *gin.Context) {
 
 	err := h.PaymentUsecase.ProcessPaymentWebhook(c.Request.Context(), payload)
 	if err != nil {
+		bizmetrics.XenditWebhookProcessed.WithLabelValues("process_error").Inc()
 		log.Logger.Error().Err(err).Msg("Failed to process payment webhook")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	bizmetrics.XenditWebhookProcessed.WithLabelValues("success").Inc()
 	c.JSON(http.StatusOK, gin.H{"message": "webhook processed"})
 }
 

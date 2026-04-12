@@ -12,6 +12,7 @@ import (
 	usergrpc "paymentfc/grpc"
 	"paymentfc/kafka"
 	"paymentfc/log"
+	"paymentfc/middleware"
 	"paymentfc/models"
 	"paymentfc/routes"
 	"paymentfc/tracing"
@@ -118,6 +119,7 @@ func main() {
 
 	port := cfg.App.Port
 	router := gin.Default()
+	router.Use(middleware.PrometheusRED("paymentfc"))
 
 	// 트레이싱 미들웨어 추가
 	if cfg.Tracing.Enabled {
