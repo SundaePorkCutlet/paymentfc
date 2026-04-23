@@ -34,6 +34,19 @@ func (h *PaymentHandler) Ping() gin.HandlerFunc {
 	}
 }
 
+// HandleXenditWebhook godoc
+// @Summary Xendit 웹훅 처리
+// @Description Xendit 결제 이벤트 웹훅을 검증하고 처리합니다.
+// @Tags PAYMENT
+// @Accept json
+// @Produce json
+// @Param x-callback-token header string true "Xendit callback token"
+// @Param body body models.XenditWebhookPayload true "웹훅 페이로드"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /v1/payment/webhook [post]
 func (h *PaymentHandler) HandleXenditWebhook(c *gin.Context) {
 	if c.GetHeader("x-callback-token") != h.XenditWebhookToken {
 		bizmetrics.XenditWebhookProcessed.WithLabelValues("invalid_token").Inc()
@@ -62,7 +75,19 @@ func (h *PaymentHandler) HandleXenditWebhook(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "webhook processed"})
 }
 
-// CreateInvoice creates a Xendit invoice for the given order and returns invoice_url etc.
+// CreateInvoice godoc
+// @Summary 인보이스 생성
+// @Description 주문 정보로 Xendit 인보이스를 생성합니다.
+// @Tags PAYMENT
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param body body models.OrderCreatedEvent true "인보이스 생성 요청"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/payment/invoice [post]
 func (h *PaymentHandler) CreateInvoice(c *gin.Context) {
 	var req models.OrderCreatedEvent
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -85,6 +110,18 @@ func (h *PaymentHandler) CreateInvoice(c *gin.Context) {
 	})
 }
 
+// HandleDownloadInvoicePdf godoc
+// @Summary 인보이스 PDF 다운로드
+// @Description 주문 ID에 대한 인보이스 PDF 파일을 다운로드합니다.
+// @Tags PAYMENT
+// @Security BearerAuth
+// @Produce application/pdf
+// @Param order_id path int true "주문 ID"
+// @Success 200 {file} file
+// @Failure 400 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/invoice/{order_id}/pdf [get]
 func (h *PaymentHandler) HandleDownloadInvoicePdf(c *gin.Context) {
 	orderIdStr := c.Param("order_id")
 
@@ -105,6 +142,16 @@ func (h *PaymentHandler) HandleDownloadInvoicePdf(c *gin.Context) {
 	c.FileAttachment(filePath, "invoice_"+orderIdStr+".pdf")
 }
 
+// HandleFailedPayments godoc
+// @Summary 실패 결제 목록 조회
+// @Description 실패한 결제 목록을 조회합니다.
+// @Tags PAYMENT
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {array} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/failed_payments [get]
 func (h *PaymentHandler) HandleFailedPayments(c *gin.Context) {
 	paymentList, err := h.PaymentUsecase.GetFailedPaymentList(c.Request.Context())
 	if err != nil {
@@ -115,6 +162,24 @@ func (h *PaymentHandler) HandleFailedPayments(c *gin.Context) {
 	c.JSON(http.StatusOK, paymentList)
 }
 
+// HandleAuditLogs godoc
+// @Summary 감사 로그 조회
+// @Description 필터/커서 기반으로 결제 감사 로그를 조회합니다.
+// @Tags PAYMENT
+// @Security BearerAuth
+// @Produce json
+// @Param event query string false "이벤트명"
+// @Param actor query string false "행위자"
+// @Param order_id query int false "주문 ID"
+// @Param user_id query int false "사용자 ID"
+// @Param cursor query string false "커서(ObjectID)"
+// @Param limit query int false "조회 개수"
+// @Param from query string false "조회 시작 시각(RFC3339 또는 YYYY-MM-DD)"
+// @Param to query string false "조회 종료 시각(RFC3339 또는 YYYY-MM-DD)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/audit-logs [get]
 func (h *PaymentHandler) HandleAuditLogs(c *gin.Context) {
 	filter := models.AuditLogFilter{
 		Event:  c.Query("event"),
@@ -157,6 +222,18 @@ func (h *PaymentHandler) HandleAuditLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, page)
 }
 
+// HandleAuditDailyReport godoc
+// @Summary 감사 로그 일별 리포트
+// @Description 기간 내 감사 로그를 일자/이벤트 기준으로 집계합니다.
+// @Tags PAYMENT
+// @Security BearerAuth
+// @Produce json
+// @Param from query string false "조회 시작 시각(RFC3339 또는 YYYY-MM-DD)"
+// @Param to query string false "조회 종료 시각(RFC3339 또는 YYYY-MM-DD)"
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /api/v1/audit-report/daily [get]
 func (h *PaymentHandler) HandleAuditDailyReport(c *gin.Context) {
 	now := time.Now().UTC()
 	from := now.AddDate(0, 0, -7)
@@ -185,6 +262,14 @@ func (h *PaymentHandler) HandleAuditDailyReport(c *gin.Context) {
 	})
 }
 
+// HandleAuditLogStream godoc
+// @Summary 감사 로그 스트림
+// @Description MongoDB Change Stream 기반의 감사 로그 SSE 스트림입니다.
+// @Tags PAYMENT
+// @Produce text/event-stream
+// @Success 200 {string} string "SSE stream"
+// @Failure 500 {object} map[string]interface{}
+// @Router /debug/mongo/stream [get]
 func (h *PaymentHandler) HandleAuditLogStream(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")

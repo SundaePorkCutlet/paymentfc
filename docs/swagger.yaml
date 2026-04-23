@@ -1,0 +1,294 @@
+basePath: /
+definitions:
+  models.OrderCreatedEvent:
+    properties:
+      order_id:
+        type: integer
+      payment_method:
+        type: string
+      shipping_address:
+        type: string
+      total_amount:
+        type: number
+      user_id:
+        type: integer
+    type: object
+  models.XenditWebhookPayload:
+    properties:
+      amount:
+        description: 웹훅에서 오면 총액 검증에 사용
+        type: number
+      external_id:
+        type: string
+      status:
+        type: string
+    type: object
+host: localhost:28083
+info:
+  contact: {}
+  description: Payment, Xendit invoice, webhook, and audit for Go Commerce.
+  title: PAYMENTFC API
+  version: "1.0"
+paths:
+  /api/v1/audit-logs:
+    get:
+      description: 필터/커서 기반으로 결제 감사 로그를 조회합니다.
+      parameters:
+      - description: 이벤트명
+        in: query
+        name: event
+        type: string
+      - description: 행위자
+        in: query
+        name: actor
+        type: string
+      - description: 주문 ID
+        in: query
+        name: order_id
+        type: integer
+      - description: 사용자 ID
+        in: query
+        name: user_id
+        type: integer
+      - description: 커서(ObjectID)
+        in: query
+        name: cursor
+        type: string
+      - description: 조회 개수
+        in: query
+        name: limit
+        type: integer
+      - description: 조회 시작 시각(RFC3339 또는 YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: 조회 종료 시각(RFC3339 또는 YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 감사 로그 조회
+      tags:
+      - PAYMENT
+  /api/v1/audit-report/daily:
+    get:
+      description: 기간 내 감사 로그를 일자/이벤트 기준으로 집계합니다.
+      parameters:
+      - description: 조회 시작 시각(RFC3339 또는 YYYY-MM-DD)
+        in: query
+        name: from
+        type: string
+      - description: 조회 종료 시각(RFC3339 또는 YYYY-MM-DD)
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 감사 로그 일별 리포트
+      tags:
+      - PAYMENT
+  /api/v1/failed_payments:
+    get:
+      description: 실패한 결제 목록을 조회합니다.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 실패 결제 목록 조회
+      tags:
+      - PAYMENT
+  /api/v1/invoice/{order_id}/pdf:
+    get:
+      description: 주문 ID에 대한 인보이스 PDF 파일을 다운로드합니다.
+      parameters:
+      - description: 주문 ID
+        in: path
+        name: order_id
+        required: true
+        type: integer
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 인보이스 PDF 다운로드
+      tags:
+      - PAYMENT
+  /api/v1/payment/invoice:
+    post:
+      consumes:
+      - application/json
+      description: 주문 정보로 Xendit 인보이스를 생성합니다.
+      parameters:
+      - description: 인보이스 생성 요청
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.OrderCreatedEvent'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 인보이스 생성
+      tags:
+      - PAYMENT
+  /debug/mongo/stream:
+    get:
+      description: MongoDB Change Stream 기반의 감사 로그 SSE 스트림입니다.
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE stream
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 감사 로그 스트림
+      tags:
+      - PAYMENT
+  /v1/payment/webhook:
+    post:
+      consumes:
+      - application/json
+      description: Xendit 결제 이벤트 웹훅을 검증하고 처리합니다.
+      parameters:
+      - description: Xendit callback token
+        in: header
+        name: x-callback-token
+        required: true
+        type: string
+      - description: 웹훅 페이로드
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.XenditWebhookPayload'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Xendit 웹훅 처리
+      tags:
+      - PAYMENT
+schemes:
+- http
+swagger: "2.0"
