@@ -76,7 +76,7 @@ func (s *paymentService) ProcessPaymentSuccess(ctx context.Context, orderID int6
 		if saveErr := s.database.SaveFailedPublishEvent(ctx, failed); saveErr != nil {
 			log.Logger.Error().Err(saveErr).Int64("order_id", orderID).Msg("Failed to save failed_event")
 		}
-		return s.publisher.PublishPaymentStatus(ctx, orderID, constant.PaymentStatusFailed, "payment.failed")
+		return err
 	}
 
 	err = s.database.MarkPaid(orderID)

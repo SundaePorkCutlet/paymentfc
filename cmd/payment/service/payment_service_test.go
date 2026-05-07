@@ -49,6 +49,21 @@ func TestPaymentService_ProcessPaymentSuccess(t *testing.T) {
 		err := svc.ProcessPaymentSuccess(ctx, orderID)
 		assert.Error(t, err)
 	})
+
+	t.Run("publish success failure records failed event without publishing payment failed", func(t *testing.T) {
+		publishErr := errors.New("kafka unavailable")
+
+		mockDB.EXPECT().IsAlreadyPaid(ctx, orderID).Return(false, nil)
+		mockAuditLog.EXPECT().SaveAuditLog(ctx, gomock.Any()).Return(nil).Times(constant.MaxRetryPublish)
+		mockPublisher.EXPECT().
+			PublishPaymentStatus(ctx, orderID, constant.PaymentStatusPaid, "payment.success").
+			Return(publishErr).
+			Times(constant.MaxRetryPublish)
+		mockDB.EXPECT().SaveFailedPublishEvent(ctx, gomock.Any()).Return(nil)
+
+		err := svc.ProcessPaymentSuccess(ctx, orderID)
+		assert.ErrorIs(t, err, publishErr)
+	})
 }
 
 func TestPaymentService_IsAlreadyPaid(t *testing.T) {
@@ -175,4 +190,3 @@ func TestPaymentService_SavePaymentRequestFromEvent(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
-

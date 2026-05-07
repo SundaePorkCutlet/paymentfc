@@ -36,3 +36,30 @@ func StartOrderConsumer(broker, topic string, handler func(models.OrderCreatedEv
 		}
 	}(reader)
 }
+
+func StartStockReservedConsumer(broker, topic string, handler func(models.StockReservationEvent)) {
+	reader := kafka.NewReader(kafka.ReaderConfig{
+		Brokers: []string{broker},
+		Topic:   topic,
+		GroupID: "paymentfc",
+	})
+
+	go func(r *kafka.Reader) {
+		defer r.Close()
+		for {
+			msg, err := r.ReadMessage(context.Background())
+			if err != nil {
+				log.Logger.Error().Err(err).Msg("Failed to read stock.reserved message")
+				continue
+			}
+
+			var event models.StockReservationEvent
+			if err := json.Unmarshal(msg.Value, &event); err != nil {
+				log.Logger.Error().Err(err).Msg("Failed to unmarshal stock.reserved message")
+				continue
+			}
+
+			handler(event)
+		}
+	}(reader)
+}

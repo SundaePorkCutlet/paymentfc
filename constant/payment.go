@@ -10,6 +10,7 @@ const (
 const (
 	KafkaTopicPaymentSuccess = "payment.success"
 	KafkaTopicOrderCreated   = "order.created"
+	KafkaTopicStockReserved  = "stock.reserved"
 )
 
 // MaxRetryPublish payment.success Kafka 발행 최대 재시도 횟수

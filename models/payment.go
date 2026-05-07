@@ -16,7 +16,7 @@ type Payment struct {
 
 type PaymentRequest struct {
 	ID         int64     `json:"id" gorm:"primaryKey;autoIncrement;type:bigserial"`
-	OrderID    int64     `json:"order_id" gorm:"type:bigint;not null;index:idx_payreq_order"`
+	OrderID    int64     `json:"order_id" gorm:"type:bigint;not null;uniqueIndex:idx_payreq_order"`
 	UserID     int64     `json:"user_id" gorm:"type:bigint"`
 	Amount     float64   `json:"amount" gorm:"type:numeric"`
 	UserEmail  string    `json:"user_email" gorm:"type:varchar"`

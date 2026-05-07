@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type PaymentDatabase interface {
@@ -121,7 +122,13 @@ func (p *paymentDatabase) GetPaymentByOrderID(ctx context.Context, orderID int64
 }
 
 func (p *paymentDatabase) SavePaymentRequest(ctx context.Context, param *models.PaymentRequest) error {
-	if err := p.DB.WithContext(ctx).Table("payment_requests").Create(param).Error; err != nil {
+	if err := p.DB.WithContext(ctx).
+		Table("payment_requests").
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "order_id"}},
+			DoNothing: true,
+		}).
+		Create(param).Error; err != nil {
 		log.Logger.Error().Err(err).Msgf("Failed to save payment request for order_id: %d", param.OrderID)
 		return err
 	}

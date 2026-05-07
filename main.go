@@ -101,17 +101,21 @@ func main() {
 	scheduler.StartProcessFailedPaymentRequests()
 	scheduler.StartSweepingExpiredPendingPayments()
 
-	// order.created 컨슈머: toggle에 따라 실시간 인보이스 vs payment_requests 저장만
-	kafka.StartOrderConsumer(cfg.Kafka.Broker, constant.KafkaTopicOrderCreated, func(event models.OrderCreatedEvent) {
+	// stock.reserved 컨슈머: 재고 예약 완료 이후 결제 요청을 생성한다.
+	kafka.StartStockReservedConsumer(cfg.Kafka.Broker, constant.KafkaTopicStockReserved, func(event models.StockReservationEvent) {
 		ctx := context.Background()
 		if cfg.Toggle.DisableCreateInvoiceDirectly {
 			// 배치 방식: 저장만, 인보이스는 배치에서 생성
-			if err := paymentUsecase.ProcessPaymentRequest(ctx, event); err != nil {
+			if err := paymentUsecase.ProcessStockReserved(ctx, event); err != nil {
 				log.Logger.Error().Err(err).Msgf("Failed to process payment request for order_id: %d", event.OrderID)
 			}
 		} else {
 			// 실시간: 바로 인보이스 생성
-			if _, err := xenditUsecase.CreateInvoice(ctx, event); err != nil {
+			if _, err := xenditUsecase.CreateInvoice(ctx, models.OrderCreatedEvent{
+				OrderID:     event.OrderID,
+				UserID:      event.UserID,
+				TotalAmount: event.TotalAmount,
+			}); err != nil {
 				log.Logger.Error().Err(err).Msgf("Failed to create invoice for order_id: %d", event.OrderID)
 			}
 		}
